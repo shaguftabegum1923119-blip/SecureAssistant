@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const Razorpay = require('razorpay');
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: '10mb' }));
@@ -302,6 +303,21 @@ app.get('/api/search', (req, res) => {
 
 app.get('/api/pricing', (req, res) => res.json({ rateCard: [{ range: "1-2", per: 99, example: "2x99=198" }, { range: "3-5", per: 85, example: "5x85=425" }, { range: "6-9", per: 70, example: "9x70=630" }, { range: "10 plus", per: 60, example: "15x60=900" }], note: "Fixed rate card as you said" }));
 app.get('/api/settings', (req, res) => res.json({ settings: "Small settings anytime - Language search voice, categories, add cameras QR WiFi IP Serial TV Old Phone, notifications, biometrics, country code change OTP, payment history, profile minimal info" }));
+
+app.post('/api/setup/full-activate', async (req, res) => {
+  try {
+    const { name, phone, countryCode, language, categories, cameraCount } = req.body;
+    const calc = calculatePrice(cameraCount || 1);
+    APP_SESSION.language = language || "English";
+    APP_SESSION.categories = categories || [];
+    APP_SESSION.cameraCount = cameraCount || 1;
+    if (!USERS[phone]) USERS[phone] = { name, phone, countryCode: countryCode || "+91", language, categories, cameraCount, cameras:[], totalPaid:0, paymentHistory:[], appState:"READY FOR PAYMENT" };
+    APP_SESSION.currentUser = USERS[phone];
+    const order = await razorpay.orders.create({ amount: calc.total * 100, currency: "INR", receipt: "secure_" + Date.now() });
+    const upiString = `upi://pay?pn=SECURE ASSISTANT&am=${calc.total}&cu=INR&tn=${cameraCount} Cameras Order ${order.id}`;
+    res.json({ success: true, pricing: `${cameraCount} x ${calc.perCamera} = ${calc.total}`, orderId: order.id, qrString: upiString, rateCard: "1-2=99, 3-5=85, 6-9=70, 10+=60", next: "POST /api/payment/verify" });
+  } catch (e) { res.json({ error: e.message }); }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`SECURE ASSISTANT LIVE on ${PORT} - FINAL FINAL COMPLETE - PURE ENGLISH ONLY - 12 CATEGORIES FULL - 20 TOOLS FULL - 6 CAMERA METHODS QR WIFI IP SERIAL TV OLD PHONE SPECIAL - OFFLINE REWIND - MULTI INPUT PHOTO VOICE TEXT VIDEO - ANY DEVICE - RATE CARD 99 85 70 60 - WORLD LANGUAGES COUNTRY CODE OTP - ABDUL WAHAB ABDUL SAMAD VISIBLE`));
