@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SECURE ASSISTANT</title>
+<style>
+body{background:#0a0a0a;color:#fff;font-family:Arial;margin:0;padding:12px}
+.card{background:#151515;border:1px solid #2a2a2a;padding:14px;border-radius:12px;margin:10px 0}
+h2{color:#00ff88} h3{color:#fff;font-size:15px;margin:8px 0}
+.btn{background:#00ff88;color:#000;padding:11px;border:none;border-radius:8px;font-weight:bold;width:100%;margin:5px 0;cursor:pointer}
+.btn2{background:#222;color:#fff;border:1px solid #444;padding:11px;border-radius:8px;width:100%;margin:5px 0}
+input,select,textarea{width:100%;padding:11px;margin:5px 0;border-radius:8px;border:1px solid #333;background:#222;color:#fff;box-sizing:border-box}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.box{background:#222;border:1px solid #333;padding:9px;border-radius:8px;font-size:12px;cursor:pointer}
+.box.on{border-color:#00ff88;background:#102a1e}
+.price{color:#00ff88;font-size:18px;font-weight:bold}
+pre{white-space:pre-wrap;word-wrap:break-word;font-size:11px;color:#ccc}
+small{color:#999}
+</style>
+</head>
+<body>
+<h2>SECURE ASSISTANT</h2>
+<div class="card">App State: <b id="appState">Loading...</b> <br><small id="appInfo"></small></div>
+
+<div class="card">
+<h3>Auth - Country Code + OTP + Language</h3>
+<input id="name" placeholder="Full Name">
+<input id="phone" placeholder="Phone Number">
+<select id="cc"></select>
+<select id="lang"></select>
+<button class="btn" onclick="register()">Register</button>
+<button class="btn2" onclick="login()">Login</button>
+<pre id="authOut"></pre>
+</div>
+
+<div class="card">
+<h3>12 Categories - From Backend</h3>
+<div id="catGrid" class="grid"></div>
+<div id="selCat"><small>Selected: None</small></div>
+</div>
+
+<div class="card">
+<h3>20 AI Tools - From Backend</h3>
+<div id="toolGrid" class="grid"></div>
+</div>
+
+<div class="card">
+<h3>Agents - Abdul Wahab & Abdul Samad - From Backend</h3>
+<pre id="agentBox"></pre>
+</div>
+
+<div class="card">
+<h3>Camera Count - Pricing From Backend Rate Card 99/85/70/60</h3>
+<pre id="rateCard"></pre>
+<input id="camCount" type="number" value="2" min="1" oninput="calcPrice()">
+<div id="priceText" class="price"></div>
+<button class="btn" onclick="setCameras()">Set Cameras & Generate QR</button>
+<div id="qrArea" style="display:none" class="card"></div>
+<button class="btn" style="background:gold" onclick="verifyPay()">Verify Payment - Auto Activate</button>
+</div>
+
+<div class="card">
+<h3>6 Camera Methods - From Backend</h3>
+<div id="methods" class="grid"></div>
+</div>
+
+<div class="card">
+<h3>Chat - Abdul Wahab Universal - Photo Video Voice Text Any Broken Language</h3>
+<textarea id="msg" placeholder="Ask: who came, when, where, why, offline rewind, camera health"></textarea>
+<button class="btn" onclick="ask()">Ask</button>
+<pre id="chatOut"></pre>
+</div>
+
+<div class="card">
+<h3>Dashboards - From Backend</h3>
+<button class="btn2" onclick="loadDash('abdul-wahab')">Abdul Wahab Dashboard</button>
+<button class="btn2" onclick="loadDash('abdul-samad')">Abdul Samad Dashboard</button>
+<button class="btn2" onclick="loadDash('auto-report')">Auto Report + Offline Rewind</button>
+<button class="btn2" onclick="loadEvents()">Events History</button>
+<pre id="dashOut"></pre>
+</div>
+
+<script>
+const API = window.location.origin;
+let selectedCats = [];
+let currentPer = 99;
+
+async function init(){
+ let r = await fetch(API + '/'); let j = await r.json();
+ document.getElementById('appState').innerText = j.appState;
+ document.getElementById('appInfo').innerText = j.flow + ' | ' + j.deviceSupport;
+
+ // Languages + Country Codes FROM BACKEND
+ let rL = await fetch(API + '/api/languages'); let jL = await rL.json();
+ document.getElementById('lang').innerHTML = jL.languages.map(l=>`<option>${l}</option>`).join('');
+ document.getElementById('cc').innerHTML = jL.countryCodes.map(c=>`<option>${c}</option>`).join('');
+
+ // Categories FROM BACKEND
+ document.getElementById('catGrid').innerHTML = j.categoriesFull.map(c=>`<div class="box" onclick="toggleCat('${c.name.replace(/'/g,"")}')"><b>${c.name}</b><br><small>${c.subCategories.join(', ')}</small><br><small style="color:#00ff88">${c.expertFeatures.join(', ')}</small></div>`).join('');
+
+ // Rate Card FROM BACKEND
+ let rP = await fetch(API + '/api/pricing'); let jP = await rP.json();
+ document.getElementById('rateCard').innerText = JSON.stringify(jP.rateCard,null,2);
+
+ // Agents FROM BACKEND
+ let rA = await fetch(API + '/api/agents'); let jA = await rA.json();
+ document.getElementById('agentBox').innerText = JSON.stringify(jA,null,2);
+
+ // Tools FROM BACKEND
+ let rT = await fetch(API + '/api/ai-tools'); let jT = await rT.json();
+ document.getElementById('toolGrid').innerHTML = jT.map(t=>`<div class="box"><b>${t.id}. ${t.name}</b><br><small>${t.work}</small><br><small>Proof: ${t.proof}</small></div>`).join('');
+
+ // Methods FROM BACKEND
+ let rM = await fetch(API + '/api/camera/add-methods'); let jM = await rM.json();
+ document.getElementById('methods').innerHTML = jM.methods.map(m=>`<div class="box"><b>${m.id}. ${m.name}</b><br><small>${m.how}</small></div>`).join('');
+
+ calcPrice();
+}
+
+function toggleCat(name){
+ if(selectedCats.includes(name)) selectedCats = selectedCats.filter(x=>x!=name);
+ else selectedCats.push(name);
+ document.getElementById('selCat').innerText = 'Selected: ' + selectedCats.join(', ');
+ fetch(API + '/api/session/set-categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({categories:selectedCats})});
+}
+function calcPrice(){
+ let count = parseInt(document.getElementById('camCount').value||1);
+ if(count>=1&&count<=2) currentPer=99; else if(count>=3&&count<=5) currentPer=85; else if(count>=6&&count<=9) currentPer=70; else if(count>=10) currentPer=60;
+ document.getElementById('priceText').innerText = count + ' x ' + currentPer + ' = ' + (count*currentPer) + ' INR';
+}
+async function register(){
+ let body={name:document.getElementById('name').value,phone:document.getElementById('phone').value,language:document.getElementById('lang').value,countryCode:document.getElementById('cc').value};
+ let r=await fetch(API+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ document.getElementById('authOut').innerText = JSON.stringify(await r.json(),null,2);
+}
+async function login(){
+ let body={phone:document.getElementById('phone').value};
+ let r=await fetch(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ let j=await r.json(); document.getElementById('authOut').innerText = JSON.stringify(j,null,2);
+ document.getElementById('appState').innerText = j.appState || j.profile?.appState || 'Loaded';
+}
+async function setCameras(){
+ let count = parseInt(document.getElementById('camCount').value);
+ await fetch(API+'/api/session/set-cameras',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cameraCount:count})});
+ let r = await fetch(API+'/api/payment/generate-qr',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cameraCount:count})});
+ let j = await r.json();
+ document.getElementById('qrArea').style.display='block';
+ document.getElementById('qrArea').innerHTML = '<b>'+j.pricing+'</b><br>Order: '+j.orderId+'<br><textarea>'+j.qrString+'</textarea>';
+}
+async function verifyPay(){
+ let r = await fetch(API+'/api/payment/verify',{method:'POST'}); let j = await r.json();
+ alert(j.appState); document.getElementById('appState').innerText = j.appState;
+}
+async function ask(){
+ let msg = document.getElementById('msg').value;
+ let r = await fetch(API+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
+ let j = await r.json();
+ document.getElementById('chatOut').innerText = j.replyPureEnglish + '\n\nProof: ' + j.proof + '\n\nOffline: ' + j.offlineRewind;
+}
+async function loadDash(t){
+ let r = await fetch(API+'/api/dashboard/'+t); let j = await r.json();
+ document.getElementById('dashOut').innerText = JSON.stringify(j,null,2);
+}
+async function loadEvents(){
+ let r = await fetch(API+'/api/events/history'); let j = await r.json();
+ document.getElementById('dashOut').innerText = JSON.stringify(j,null,2);
+}
+init();
+</script>
+</body>
+</html>
