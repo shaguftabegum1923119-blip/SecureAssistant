@@ -82,20 +82,24 @@ app.get('/api/camera/add-methods',(req,res)=>res.json({methods:[
   {id:6,name:"Old Phone as CCTV Special",detail:"Install SECURE ASSISTANT on old phone login same account old phone shows Use as CCTV QR scan with main phone old phone camera mic both become advance CCTV with all 25 tools battery health monitoring offline record rewind when online",health:["Battery low alert","Storage full alert","Internet slow alert","Lens dirty alert"]}
 ]}));
 app.post('/api/payment/calculate',(req,res)=>res.json(calculatePrice(req.body.cameraCount||1)));
+
+// FIXED QR - UPI_ID hataya, double app.post hataya, Razorpay auto order only - 404 fix
 app.post('/api/payment/generate-qr',async(req,res)=>{try{
   let c=calculatePrice(req.body.cameraCount||1);
   let order=await razorpay.orders.create({amount:c.total*100,currency:"INR",receipt:"secure_"+Date.now()});
   res.json({
     orderId:order.id,
     keyId:process.env.RAZORPAY_KEY_ID,
-    qrString:`upi://pay?pa=${process.env.UPI_ID}&pn=SECURE ASSISTANT&am=${c.total}&tr=${order.id}`,
-    total:c.total,per:c.per,
+    total:c.total,
+    per:c.perCamera,
+    count:c.count,
     corePromise:CORE_PROMISE,
     gateway:"Razorpay",
     razorpayKeyUsed:"KEY_ID from env",
     razorpaySecretUsed:"KEY_SECRET from env for signature"
   });
 }catch(e){res.json({error:e.message})}});
+
 app.post('/api/payment/verify',(req,res)=>{
   const {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body;
   if(!razorpay_order_id) return res.json({success:false,error:"Missing proof"});
@@ -103,8 +107,17 @@ app.post('/api/payment/verify',(req,res)=>{
   if(expected!==razorpay_signature) return res.json({success:false,error:"Signature FAIL blocked by Abdul Samad - "+CORE_PROMISE});
   res.json({success:true,appState:"ON",message:"Payment 100 percent verified auto activate "+CORE_PROMISE+" Razorpay signature verified with key secret",expiry:"30 days",autoPay:"Customer can enable auto pay monthly",corePromise:CORE_PROMISE,gatewayVerified:true});
 });
-app.post('/api/auth/register',(req,res)=>{let {name,phone,email,countryCode,language,password}=req.body; USERS[phone]={name,phone,email,countryCode,language,passwordStrong:password?true:false,createdAt:new Date()}; res.json({success:true,profile:USERS[phone],corePromise:CORE_PROMISE,flow:"Firebase Phone Google Email Biometric"});});
-app.post('/api/auth/update-profile',(req,res)=>{let {phone,newPhone,newEmail}=req.body; if(USERS[phone]){if(newPhone) USERS[phone].phone=newPhone; if(newEmail) USERS[phone].email=newEmail;} res.json({success:true,updated:USERS[phone],message:"Customer can change phone number email anytime own control",corePromise:CORE_PROMISE});});
+
+app.post('/api/auth/register',(req,res)=>{
+  let {name,phone,email,countryCode,language,password,firebaseUid,authProvider}=req.body;
+  let phoneStr=String(phone||"").trim();
+  let ccStr=String(countryCode||"+91").trim();
+  let id=firebaseUid||(ccStr+"_"+phoneStr)||String(phone);
+  USERS[id]={id,firebaseUid:firebaseUid||null,name,phone:phoneStr,countryCode:ccStr,fullPhone:ccStr+" "+phoneStr,email,language,authProvider:authProvider||"phone",passwordStrong:password?true:false,createdAt:new Date(),corePromise:CORE_PROMISE};
+  res.json({success:true,profile:USERS[id],corePromise:CORE_PROMISE,flow:"Firebase Phone Google Email Biometric - 249 codes"};
+);
+});
+app.post('/api/auth/update-profile',(req,res)=>{let {phone,newPhone,newEmail,firebaseUid,countryCode}=req.body; let id=firebaseUid||phone; let u=USERS[id]||USERS[phone]; if(u){if(newPhone) u.phone=String(newPhone); if(newEmail) u.email=String(newEmail); if(countryCode) {u.countryCode=String(countryCode); u.fullPhone=String(countryCode)+" "+u.phone;}} res.json({success:true,updated:u,message:"Customer can change phone number email anytime own control",corePromise:CORE_PROMISE});});
 app.post('/api/chat',(req,res)=>{let q=(req.body.message||"").toLowerCase(); let base="Have a nice day. Take care. You are doing great. "; if(q.includes("who")||q.includes("kaun")) base="Today 3 came. Ahmed loyal 2 times. Unknown 11 PM. Proof Click_14_18_22.jpg Before 2:15 incident 2:18 after 2:20. Have a nice day. "; if(q.includes("offline")) base="Offline 2:15 to 3:30 power gone. Cameras recorded offline. Rewind 2:45 2 persons came 2:50 intrusion proof Offline_02_45.jpg. Daily report sent. Take care. "; res.json({replyPureEnglish:base+CORE_PROMISE,proof:"Real Click only",by:"Abdul Wahab",security:"Abdul Samad",corePromise:CORE_PROMISE});});
 
 app.use(express.static(path.join(__dirname,'public')));
