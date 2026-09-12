@@ -9,6 +9,8 @@ app.use(express.json({limit:'20mb'}));
 app.use(rateLimit({windowMs:15*60*1000,max:500}));
 
 const CORE_PROMISE="My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100% secure encrypted.";
+const razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET});
+let USERS={};
 
 const AGENTS={
   ABDUL_WAHAB:{name:"Abdul Wahab",role:"Main Brain",greeting:"Have a nice day, Take care, You are doing great",corePromise:CORE_PROMISE,work:"Understands broken language, voice, text, photo, video clip. Offline records when WiFi power gone, rewinds full detail when back why when where how with real photo proof before after. Never fake video only real click. Respectful talk. Daily report auto.",dashboard:"Who came, loyal customer history, incidents before after real photos, live location share, camera health, daily report"},
@@ -63,7 +65,6 @@ const AI_TOOLS=[
 
 function calculatePrice(count){let per=count<=2?99:count<=5?85:count<=9?70:60;return{perCamera:per,total:count*per,count}}
 
-// === HEALTH LINE EXACTLY YAHAN - STATIC SE PEHLE FIX ===
 app.get('/api/health', (req,res)=>{
   res.json({ status: "ON", app: "SECURE ASSISTANT", time: new Date().toISOString(), corePromise: CORE_PROMISE, neverLie: true, privacyLeak: "NEVER", hackProof: "100% Abdul Samad protected", speed: "Very Fast" })
 });
@@ -81,8 +82,6 @@ app.get('/api/camera/add-methods',(req,res)=>res.json({methods:[
   {id:6,name:"Old Phone as CCTV Special",detail:"Install SECURE ASSISTANT on old phone login same account old phone shows Use as CCTV QR scan with main phone old phone camera mic both become advance CCTV with all 25 tools battery health monitoring offline record rewind when online",health:["Battery low alert","Storage full alert","Internet slow alert","Lens dirty alert"]}
 ]}));
 app.post('/api/payment/calculate',(req,res)=>res.json(calculatePrice(req.body.cameraCount||1)));
-
-// RAZORPAY GATEWAY WITH KEY ID, SECRET, SIGNATURE VERIFY, UPI, PAYMENT FULL DETAILS
 app.post('/api/payment/generate-qr',async(req,res)=>{try{
   let c=calculatePrice(req.body.cameraCount||1);
   let order=await razorpay.orders.create({amount:c.total*100,currency:"INR",receipt:"secure_"+Date.now()});
@@ -97,7 +96,6 @@ app.post('/api/payment/generate-qr',async(req,res)=>{try{
     razorpaySecretUsed:"KEY_SECRET from env for signature"
   });
 }catch(e){res.json({error:e.message})}});
-
 app.post('/api/payment/verify',(req,res)=>{
   const {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body;
   if(!razorpay_order_id) return res.json({success:false,error:"Missing proof"});
@@ -105,15 +103,12 @@ app.post('/api/payment/verify',(req,res)=>{
   if(expected!==razorpay_signature) return res.json({success:false,error:"Signature FAIL blocked by Abdul Samad - "+CORE_PROMISE});
   res.json({success:true,appState:"ON",message:"Payment 100 percent verified auto activate "+CORE_PROMISE+" Razorpay signature verified with key secret",expiry:"30 days",autoPay:"Customer can enable auto pay monthly",corePromise:CORE_PROMISE,gatewayVerified:true});
 });
-
 app.post('/api/auth/register',(req,res)=>{let {name,phone,email,countryCode,language,password}=req.body; USERS[phone]={name,phone,email,countryCode,language,passwordStrong:password?true:false,createdAt:new Date()}; res.json({success:true,profile:USERS[phone],corePromise:CORE_PROMISE,flow:"Firebase Phone Google Email Biometric"});});
 app.post('/api/auth/update-profile',(req,res)=>{let {phone,newPhone,newEmail}=req.body; if(USERS[phone]){if(newPhone) USERS[phone].phone=newPhone; if(newEmail) USERS[phone].email=newEmail;} res.json({success:true,updated:USERS[phone],message:"Customer can change phone number email anytime own control",corePromise:CORE_PROMISE});});
 app.post('/api/chat',(req,res)=>{let q=(req.body.message||"").toLowerCase(); let base="Have a nice day. Take care. You are doing great. "; if(q.includes("who")||q.includes("kaun")) base="Today 3 came. Ahmed loyal 2 times. Unknown 11 PM. Proof Click_14_18_22.jpg Before 2:15 incident 2:18 after 2:20. Have a nice day. "; if(q.includes("offline")) base="Offline 2:15 to 3:30 power gone. Cameras recorded offline. Rewind 2:45 2 persons came 2:50 intrusion proof Offline_02_45.jpg. Daily report sent. Take care. "; res.json({replyPureEnglish:base+CORE_PROMISE,proof:"Real Click only",by:"Abdul Wahab",security:"Abdul Samad",corePromise:CORE_PROMISE});});
 
-// STATIC SABSE NICHE - HEALTH KE BAAD
 app.use(express.static(path.join(__dirname,'public')));
 app.get('/',(req,res)=>res.json({appName:"SECURE ASSISTANT",corePromise:CORE_PROMISE,agents:AGENTS,categoriesCount:12,toolsCount:25,neverLie:true,privacy:"Never leaks",hackProof:true,speed:"Very Fast",gateway:"Razorpay key_id key_secret signature UPI"}));
 
-const razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET});
 const PORT=process.env.PORT||10000;
 app.listen(PORT,()=>console.log("SECURE ASSISTANT LIVE "+PORT));
