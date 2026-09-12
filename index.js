@@ -114,8 +114,7 @@ app.post('/api/auth/register',(req,res)=>{
   let ccStr=String(countryCode||"+91").trim();
   let id=firebaseUid||(ccStr+"_"+phoneStr)||String(phone);
   USERS[id]={id,firebaseUid:firebaseUid||null,name,phone:phoneStr,countryCode:ccStr,fullPhone:ccStr+" "+phoneStr,email,language,authProvider:authProvider||"phone",passwordStrong:password?true:false,createdAt:new Date(),corePromise:CORE_PROMISE};
-  res.json({success:true,profile:USERS[id],corePromise:CORE_PROMISE,flow:"Firebase Phone Google Email Biometric - 249 codes"};
-);
+  res.json({success:true,profile:USERS[id],corePromise:CORE_PROMISE,flow:"Firebase Phone Google Email Biometric - 249 codes"});
 });
 app.post('/api/auth/update-profile',(req,res)=>{let {phone,newPhone,newEmail,firebaseUid,countryCode}=req.body; let id=firebaseUid||phone; let u=USERS[id]||USERS[phone]; if(u){if(newPhone) u.phone=String(newPhone); if(newEmail) u.email=String(newEmail); if(countryCode) {u.countryCode=String(countryCode); u.fullPhone=String(countryCode)+" "+u.phone;}} res.json({success:true,updated:u,message:"Customer can change phone number email anytime own control",corePromise:CORE_PROMISE});});
 app.post('/api/chat',(req,res)=>{let q=(req.body.message||"").toLowerCase(); let base="Have a nice day. Take care. You are doing great. "; if(q.includes("who")||q.includes("kaun")) base="Today 3 came. Ahmed loyal 2 times. Unknown 11 PM. Proof Click_14_18_22.jpg Before 2:15 incident 2:18 after 2:20. Have a nice day. "; if(q.includes("offline")) base="Offline 2:15 to 3:30 power gone. Cameras recorded offline. Rewind 2:45 2 persons came 2:50 intrusion proof Offline_02_45.jpg. Daily report sent. Take care. "; res.json({replyPureEnglish:base+CORE_PROMISE,proof:"Real Click only",by:"Abdul Wahab",security:"Abdul Samad",corePromise:CORE_PROMISE});});
