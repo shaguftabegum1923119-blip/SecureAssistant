@@ -3,8 +3,20 @@ require('dotenv').config();
 const express=require('express'),helmet=require('helmet'),cors=require('cors'),rateLimit=require('express-rate-limit'),crypto=require('crypto'),path=require('path'),Razorpay=require('razorpay');
 const app=express();
 app.set('trust proxy',1);
-app.use(helmet());
-app.use(cors({origin:true}));
+// FIXED FOR FLUTTERFLOW DESKTOP - Helmet rahega security ke liye, par Desktop ko allow karega
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: false
+}));
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization","X-Requested-With","x-razorpay-signature"]
+}));
+app.options('*', cors());
 app.use(express.json({limit:'20mb'}));
 app.use(rateLimit({windowMs:15*60*1000,max:500}));
 
