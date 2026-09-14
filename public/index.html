@@ -2,15 +2,12 @@
 <style>body{margin:0;background:#0a0a0a;color:#fff;font-family:sans-serif;padding-bottom:90px}.card{background:#1a1a1a;border-radius:12px;padding:12px;margin:10px;border:1px solid #333}.promise{border:2px solid #00ff88;background:#001a0d;text-align:center;color:#00ff88}.wahab{border:2px solid #00ff88}.samad{border:2px solid #ff0040}.bottom{position:fixed;bottom:0;display:flex;width:100%;background:#000;border-top:1px solid #333;z-index:99}.bottom button{flex:1;padding:14px;background:#000;color:#fff;border:0}.active{color:#00ff88!important}.searchBox{display:flex;gap:5px}input,select{padding:8px;border-radius:8px;border:0;flex:1}button{cursor:pointer}</style>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script><script src="https://checkout.razorpay.com/v1/checkout.js"></script></head><body>
 <div class="card promise">CORE PROMISE: My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks.</div>
-
 <div id="screen-login"><div class="card"><h2>Language Search</h2><div class="searchBox"><input id="langSearch" placeholder="Search language English Telugu" oninput="filterLang()"><button onclick="startVoice('langSearch')">🎤</button></div><select id="langSel"></select>
 <h2>Login - Country Code Search</h2><div class="searchBox"><input id="countrySearch" placeholder="Search country code +91 India" oninput="filterCountry()"><button onclick="startVoice('countrySearch')">🎤</button></div><select id="countrySel"></select><br><br>
 <input id="phone" placeholder="Phone number"><br><br><input id="email" placeholder="Email Google login"><br><br><input id="pass" type="password" placeholder="Strong Password"><br><br>
 <button onclick="doLogin()">Login with Phone Email Google Biometric</button><br><br><small>Firebase Auth Phone OTP Google Biometric Fingerprint Face Unlock</small></div></div>
-
 <div id="app" style="display:none">
 <div id="p-chat"><div class="card wahab" id="wahabCard"></div><div class="card samad" id="samadCard"></div><div class="card"><div class="searchBox"><input id="chatIn" placeholder="Ask who came offline? Search with mic text"><button onclick="startVoice('chatIn')">🎤</button><button onclick="chat()">Send</button></div><div id="chatBox"></div></div></div>
-
 <div id="p-live" style="display:none">
 <div class="card"><h3>Permissions - Internet WiFi Notification SMS Call Location Camera Storage</h3><button onclick="askAllPermissions()">Allow All Permissions</button><br><br><small>Internet+WiFi for video upload live, Notification for emergency alert Fall Fire Weapon Intrusion, SMS backup when internet gone, Phone Call emergency permission se, Location for incident live share, Camera Storage for old phone CCTV</small><br><br>
 <button onclick="triggerEmergency('Fall')">Test Fall</button> <button onclick="triggerEmergency('Fire')">Test Fire</button> <button onclick="triggerEmergency('Weapon')">Test Weapon</button> <button onclick="triggerEmergency('Intrusion')">Test Intrusion</button> <div id="emergencyInfo"></div>
@@ -18,7 +15,6 @@
 <div class="card"><div class="searchBox"><input id="toolSearch" placeholder="Search AI tool Face Crowd"><button onclick="startVoice('toolSearch')">🎤</button></div><div id="tools"></div></div>
 <div class="card"><h3>6 Camera Methods + Old Phone as CCTV Special</h3><div id="methods"></div><div>Health Below Live: Battery Storage Internet Lens Dirty</div><br>
 <input type="file" id="videoFile" accept="video/*" capture="environment"><button onclick="uploadVideo()">Upload Video - Nikalo Deal Kya Hua Kahan Hua - Capsule Save 1 Year</button><div id="dealBox"></div></div></div>
-
 <div id="p-cat" style="display:none"><div class="card">
 <h3>Home Page - Locations Wise - PLUS Option</h3>
 <div id="selInfo" style="color:#00ff88">0 Categories Selected - App is expert in none</div><br>
@@ -26,14 +22,10 @@
 <div class="searchBox"><input id="catSearch" placeholder="Search category Home School Mall"><button onclick="startVoice('catSearch')">🎤</button></div><div id="cats"></div><br>
 <button onclick="addLocation()">+ Add This Location - 10/50/100 bhi add kar sakte - Unlimited</button><br><br><div id="locList"></div>
 </div></div>
-
 <div id="p-pay" style="display:none"><div class="card"><h3>Calculator Rate Card 1-2=99 3-5=85 6-9=70 10+=60</h3>Total: <b id="totalCamShow">1</b> Camera = <span id="price"></span><br><br>QR Canvas<br><canvas id="qr"></canvas><div id="order"></div><button onclick="gen()">Generate QR UPI - Locations Wise</button><button onclick="pay()">Pay Razorpay 100% Signature Verify by Abdul Samad</button><br><br><label><input type="checkbox" id="autoPay"> Auto Pay Monthly</label><br>Holder max 3 face photo, Staff unlimited searchable<br><div class="searchBox"><input id="staffSearch" placeholder="Search staff Ahmed unlimited"><button onclick="startVoice('staffSearch')">🎤</button></div></div></div>
-
 <div id="p-me" style="display:none"><div class="card"><h3>Me - Firebase Auth + Security + 1 Year Memory</h3>Phone: <input id="mePhone"> <button onclick="updateProfilePhone()">Change Phone</button><br><br>Email: <input id="meEmail"> <button onclick="updateProfileEmail()">Change Email</button><br><br>Language: <select id="meLang"></select> Country Code: <select id="meCountry"></select><br><br>Password Strong Encrypted<br>Firebase Storage Encrypted Backup 1 Year Daily Report<br><div id="meSamad"></div><br>Storage Used: <span id="storageUsed">0 MB</span> / 1 Year Capsule</div></div>
-
 <div class="bottom"><button id="b-chat" class="active" onclick="show('chat')">A Chat</button><button id="b-live" onclick="show('live')">B Live</button><button id="b-cat" onclick="show('cat')">C Category</button><button id="b-pay" onclick="show('pay')">D Pay</button><button id="b-me" onclick="show('me')">E Me</button></div>
 </div>
-
 <script>
 let base=location.origin, curOrder=null, curKey=null, curAmt=null, currentPhone=null, allLocations=[], selectedCatIds=[], allLangs=[], allCountries=[];
 function startVoice(id){if(!('webkitSpeechRecognition' in window)){alert('Voice not supported use text');return;}let r=new webkitSpeechRecognition(); r.lang='en-US'; r.onresult=e=>{document.getElementById(id).value=e.results[0][0].transcript; document.getElementById(id).dispatchEvent(new Event('input'));}; r.start();}
@@ -54,21 +46,8 @@ async function calc(){let c=window.totalCam||1; let d=await api('/api/payment/ca
 async function gen(){if(allLocations.length==0){alert('Pehle C Category me location add karo Mall 5 + Home 4 jaise');return;} let d=await api('/api/payment/generate-qr','POST',{locations:allLocations, totalCameraCount:window.totalCam}); curOrder=d.orderId; curKey=d.keyId; document.getElementById('order').innerText='Order '+d.orderId+' Total '+d.count+' Promise '+d.corePromise; QRCode.toCanvas(document.getElementById('qr'), String(d.orderId));}
 function pay(){if(!curOrder){alert('Generate QR pehle');return;}let opt={key:curKey,amount:curAmt,currency:'INR',name:'SECURE ASSISTANT',description:'My AI agents never lie my app never lies and my app never leaks customer privacy',order_id:curOrder,handler:res=>{api('/api/payment/verify','POST',res).then(d=>alert(d.success?d.message+' App ON Auto Pay '+(document.getElementById('autoPay').checked?'Enabled':''):'FAIL '+d.error));}}; new Razorpay(opt).open();}
 async function chat(){let msg=document.getElementById('chatIn').value; let d=await api('/api/chat','POST',{message:msg, language:document.getElementById('langSel').value}); document.getElementById('chatBox').innerHTML+=`<div>You:${msg}</div><div style="color:#00ff88">Wahab:${d.replyPureEnglish}</div><hr>`;}
-async function askAllPermissions(){
-  if(!navigator.onLine) alert('Internet/WiFi ON karo - offline me bhi record hoga rewind ke saath');
-  try{ let p=await Notification.requestPermission(); if(p==='granted') new Notification('SECURE ASSISTANT',{body:'Notification ON Emergency ready CORE PROMISE'}); alert('Notification: '+p);}catch(e){}
-  navigator.geolocation.getCurrentPosition(async pos=>{await api('/api/location/update','POST',{phone:currentPhone, lat:pos.coords.latitude, lng:pos.coords.longitude}); alert('Location Permission OK '+pos.coords.latitude);}, err=>alert('Location denied '+err.message));
-  try{ await navigator.mediaDevices.getUserMedia({video:true,audio:true}); alert('Camera+Mic+Storage Permission OK Old phone as CCTV ready'); }catch(e){ alert('Camera: '+e.message); }
-}
-async function triggerEmergency(type){
-  let ok=confirm(type+' DETECTED! Real photo proof. Country ke hisab se emergency number pe call karu? Permission se?');
-  if(!ok) return;
-  let res=await api('/api/emergency/action','POST',{phone:currentPhone, emergencyType:type});
-  document.getElementById('emergencyInfo').innerText=res.message+' Number:'+res.emergencyNumber+' Country:'+res.country+' Live:'+res.liveLink;
-  alert(res.message);
-  window.location.href='tel:'+res.emergencyNumber;
-  try{ if(navigator.share) await navigator.share({title:'EMERGENCY '+type, text:res.smsText}); }catch(e){}
-}
+async function askAllPermissions(){if(!navigator.onLine) alert('Internet/WiFi ON karo - offline me bhi record hoga rewind ke saath'); try{ let p=await Notification.requestPermission(); if(p==='granted') new Notification('SECURE ASSISTANT',{body:'Notification ON Emergency ready CORE PROMISE'}); alert('Notification: '+p);}catch(e){} navigator.geolocation.getCurrentPosition(async pos=>{await api('/api/location/update','POST',{phone:currentPhone, lat:pos.coords.latitude, lng:pos.coords.longitude}); alert('Location Permission OK '+pos.coords.latitude);}, err=>alert('Location denied '+err.message)); try{ await navigator.mediaDevices.getUserMedia({video:true,audio:true}); alert('Camera+Mic+Storage Permission OK Old phone as CCTV ready'); }catch(e){ alert('Camera: '+e.message); }}
+async function triggerEmergency(type){let ok=confirm(type+' DETECTED! Real photo proof. Country ke hisab se emergency number pe call karu? Permission se?'); if(!ok) return; let res=await api('/api/emergency/action','POST',{phone:currentPhone, emergencyType:type}); document.getElementById('emergencyInfo').innerText=res.message+' Number:'+res.emergencyNumber+' Country:'+res.country+' Live:'+res.liveLink; alert(res.message); window.location.href='tel:'+res.emergencyNumber; try{ if(navigator.share) await navigator.share({title:'EMERGENCY '+type, text:res.smsText}); }catch(e){}}
 async function uploadVideo(){let f=document.getElementById('videoFile').files[0]; if(!f){alert('Video select karo');return;} let r=await api('/api/video/upload-analyze','POST',{phone:currentPhone, videoSize:f.size, fileName:f.name}); document.getElementById('dealBox').innerText=r.message+' Capsule:'+r.capsuleId; document.getElementById('storageUsed').innerText=(r.storageUsed/1024/1024).toFixed(2)+' MB'; alert(r.message);}
 loadAll(); document.getElementById('catSearch').addEventListener('input',loadCats); document.getElementById('toolSearch').addEventListener('input',loadTools);
 </script></body></html>

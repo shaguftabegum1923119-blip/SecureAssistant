@@ -5,9 +5,9 @@ const app=express();
 app.set('trust proxy',1);
 app.use(helmet({crossOriginEmbedderPolicy:false,crossOriginOpenerPolicy:false,crossOriginResourcePolicy:false,contentSecurityPolicy:false}));
 app.use(cors({origin:true,credentials:true,methods:["GET","POST","PUT","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization","X-Requested-With","x-razorpay-signature"]}));
-app.options('*',cors());
 app.use(express.json({limit:'100mb'}));
 app.use(rateLimit({windowMs:15*60*1000,max:1000}));
+app.use(express.static(__dirname));
 
 const CORE_PROMISE="My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100% secure encrypted.";
 const razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET});
@@ -63,7 +63,6 @@ const CAM_METHODS=[
 {id:5,name:"Gallery Import",detail:"Import from gallery for proof",health:["Storage"]},
 {id:6,name:"Old Phone as CCTV Special",detail:"Old android phone becomes CCTV with health below live",health:["Battery Low","Storage Full","Internet Slow","Lens Dirty"]}
 ];
-// Country wise emergency numbers - auto generate
 const EMERGENCY_MAP={
 "+91":{country:"India", Fall:"108", Fire:"101", Weapon:"100", Intrusion:"100", General:"112", Ambulance:"108", Police:"100"},
 "+1":{country:"USA Canada", Fall:"911", Fire:"911", Weapon:"911", Intrusion:"911", General:"911", Ambulance:"911", Police:"911"},
@@ -79,6 +78,7 @@ const EMERGENCY_MAP={
 };
 
 function calcRate(count){ if(count<=2) return 99; if(count<=5) return 85; if(count<=9) return 70; return 60; }
+function ccodeFix(cc){ if(!cc) return "+91"; return cc.split(' ')[0]; }
 
 app.get('/api/agents',(req,res)=>res.json(AGENTS));
 app.get('/api/languages',(req,res)=>res.json({languages:LANGUAGES,countryCodes:COUNTRY_CODES,corePromise:CORE_PROMISE}));
@@ -93,24 +93,16 @@ if(!phone) return res.status(400).json({error:"Phone required"});
 USERS[phone]={phone,email,password,countryCode:ccodeFix(countryCode),language,name,created:Date.now(),storageUsed:0,location:{lat:null,lng:null,permission:false},capsules:[]};
 res.json({success:true,message:"Firebase Auth Phone OTP Google Biometric Registered",user:USERS[phone],corePromise:CORE_PROMISE});
 });
-function ccodeFix(cc){ if(!cc) return "+91"; return cc.split(' ')[0]; }
 app.post('/api/register',(req,res)=>{ let {phone,email,password,countryCode,language,name}=req.body; USERS[phone]={phone,email,password,countryCode:ccodeFix(countryCode),language,name,created:Date.now(),storageUsed:0,location:{},capsules:[]}; res.json({success:true,user:USERS[phone]}); });
 app.post('/api/auth/update-profile',(req,res)=>{ let {phone,newPhone,newEmail,location}=req.body; if(!USERS[phone]) return res.status(404).json({error:"User not found"}); if(newPhone){ USERS[newPhone]={...USERS[phone],phone:newPhone}; delete USERS[phone]; phone=newPhone; } if(newEmail) USERS[phone].email=newEmail; if(location) USERS[phone].location=location; res.json({success:true,user:USERS[phone]}); });
-
 app.post('/api/payment/calculate',(req,res)=>{ let {cameraCount,totalCameraCount,locations}=req.body; let count=totalCameraCount||cameraCount||1; if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0); let per=calcRate(count); res.json({count,perCamera:per,total:count*per,corePromise:CORE_PROMISE}); });
 app.post('/api/calculatePrice',(req,res)=>{ let {cameraCount}=req.body; let per=calcRate(cameraCount); res.json({count:cameraCount,perCamera:per,total:cameraCount*per}); });
-
 app.post('/api/payment/generate-qr', async (req,res)=>{ try{ let {cameraCount,totalCameraCount,locations}=req.body; let count=totalCameraCount||cameraCount||1; if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0); let per=calcRate(count); let amount=count*per*100; let order=await razorpay.orders.create({amount,currency:'INR',receipt:'rec_'+Date.now()}); res.json({orderId:order.id,keyId:process.env.RAZORPAY_KEY_ID,count,total:count*per,locations,corePromise:CORE_PROMISE}); }catch(e){ res.status(500).json({error:e.message}); } });
-
 app.post('/api/payment/verify',(req,res)=>{ let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body; let body=razorpay_order_id+"|"+razorpay_payment_id; let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex'); if(expected===razorpay_signature) res.json({success:true,message:"100% Signature Verify by Abdul Samad App ON",corePromise:CORE_PROMISE}); else res.json({success:false,error:"Signature FAIL hack blocked"}); });
 app.post('/api/verifyPayment',(req,res)=>{ let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body; let body=razorpay_order_id+"|"+razorpay_payment_id; let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex'); if(expected===razorpay_signature) res.json({success:true,message:"Verified App ON"}); else res.json({success:false,error:"FAIL"}); });
-
 app.post('/api/chat',(req,res)=>{ let {message,language}=req.body; res.json({replyPureEnglish:`Wahab: Understood "${message}" Lang:${language||'en'}. Daily report who came before 2:15 incident 2:18 after 2:20 real photo proof. ${CORE_PROMISE}`,corePromise:CORE_PROMISE}); });
-
 app.post('/api/video/upload-analyze',(req,res)=>{ let {phone,videoSize,fileName}=req.body; if(phone&&USERS[phone]){ USERS[phone].storageUsed=(USERS[phone].storageUsed||0)+(videoSize||0); USERS[phone].capsules.push({id:"cap_"+Date.now(),fileName,size:videoSize,time:Date.now()}); } res.json({success:true,message:"Video uploaded capsule saved encrypted 1 year. Deal extracted what happened where with time proof "+fileName, capsuleId:"cap_"+Date.now(), storageUsed:USERS[phone]?.storageUsed||videoSize, corePromise:CORE_PROMISE}); });
 app.post('/api/location/update',(req,res)=>{ let {phone,lat,lng}=req.body; if(USERS[phone]) USERS[phone].location={lat,lng,permission:true,updated:Date.now()}; res.json({success:true,message:"Location permission granted saved"}); });
-
-// EMERGENCY - Country wise auto number
 app.post('/api/emergency/action',(req,res)=>{
 let {phone,emergencyType}=req.body;
 let user=USERS[phone]||{countryCode:"+91",location:{lat:17.0,lng:79.0}};
@@ -123,6 +115,7 @@ res.json({success:true, country:map.country, countryCode:cc, emergencyType, emer
 });
 app.post('/api/sms/send',(req,res)=>{ let {phone,message}=req.body; console.log(`SMS to ${phone}: ${message}`); res.json({success:true,message:"SMS sent SIM offline backup "+CORE_PROMISE}); });
 
+app.get('/health',(req,res)=>res.json({ok:true,live:"SECURE ASSISTANT LIVE",corePromise:CORE_PROMISE,time:Date.now()}));
 app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'index.html')));
 const PORT=process.env.PORT||10000;
-app.listen(PORT,()=>console.log('SECURE ASSISTANT LIVE '+PORT));
+app.listen(PORT,'0.0.0.0',()=>console.log('SECURE ASSISTANT LIVE '+PORT));
