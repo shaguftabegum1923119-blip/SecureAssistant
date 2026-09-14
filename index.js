@@ -1,13 +1,15 @@
 // SECURE ASSISTANT - CORE PROMISE: My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake video only real click proof. Very fast. No one can hack. 100% signature verify encrypted.
 require('dotenv').config();
-const express=require('express'),helmet=require('helmet'),cors=require('cors'),rateLimit=require('express-rate-limit'),crypto=require('crypto'),path=require('path'),Razorpay=require('razorpay');
+const express=require('express'),helmet=require('helmet'),cors=require('cors'),rateLimit=require('express-rate-limit'),crypto=require('crypto'),path=require('path'),Razorpay=require('razorpay'),fs=require('fs');
 const app=express();
 app.set('trust proxy',1);
 app.use(helmet({crossOriginEmbedderPolicy:false,crossOriginOpenerPolicy:false,crossOriginResourcePolicy:false,contentSecurityPolicy:false}));
 app.use(cors({origin:true,credentials:true,methods:["GET","POST","PUT","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization","X-Requested-With","x-razorpay-signature"]}));
 app.use(express.json({limit:'100mb'}));
 app.use(rateLimit({windowMs:15*60*1000,max:1000}));
-app.use(express.static(__dirname));
+
+// FIX: Sirf public se dhoondo - aapne jo bola wahi!
+app.use(express.static(path.join(__dirname, 'public')));
 
 const CORE_PROMISE="My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100% secure encrypted.";
 const razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET});
@@ -116,6 +118,9 @@ res.json({success:true, country:map.country, countryCode:cc, emergencyType, emer
 app.post('/api/sms/send',(req,res)=>{ let {phone,message}=req.body; console.log(`SMS to ${phone}: ${message}`); res.json({success:true,message:"SMS sent SIM offline backup "+CORE_PROMISE}); });
 
 app.get('/health',(req,res)=>res.json({ok:true,live:"SECURE ASSISTANT LIVE",corePromise:CORE_PROMISE,time:Date.now()}));
-app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'index.html')));
+
+// FIX FINAL: Public se dhoondo, root se nahi - aapki demand
+app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
+
 const PORT=process.env.PORT||10000;
 app.listen(PORT,'0.0.0.0',()=>console.log('SECURE ASSISTANT LIVE '+PORT));
