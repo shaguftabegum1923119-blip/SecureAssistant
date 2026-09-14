@@ -1,17 +1,26 @@
 // SECURE ASSISTANT - CORE PROMISE: My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake video only real click proof. Very fast. No one can hack. 100% signature verify encrypted.
 require('dotenv').config();
-const express=require('express'),helmet=require('helmet'),cors=require('cors'),rateLimit=require('express-rate-limit'),crypto=require('crypto'),path=require('path'),Razorpay=require('razorpay');
+const express=require('express'),helmet=require('helmet'),cors=require('cors'),rateLimit=require('express-rate-limit'),crypto=require('crypto'),path=require('path'),Razorpay=require('razorpay'),multer=require('multer');
 const app=express();
+const upload=multer({dest:'uploads/'});
 app.set('trust proxy',1);
 app.use(helmet({crossOriginEmbedderPolicy:false,crossOriginOpenerPolicy:false,crossOriginResourcePolicy:false,contentSecurityPolicy:false}));
-app.use(cors({origin:true,credentials:true,methods:["GET","POST","PUT","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization","X-Requested-With","x-razorpay-signature"]}));
-app.use(express.json({limit:'100mb'}));
+const ALLOWED_ORIGINS = process.env.FRONTEND_URL? process.env.FRONTEND_URL.split(',') : null;
+app.use(cors({origin: ALLOWED_ORIGINS || true,credentials:true,methods:["GET","POST","PUT","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization","X-Requested-With","x-razorpay-signature"]}));
+app.use(express.json({limit:'10mb'}));
 app.use(rateLimit({windowMs:15*60*1000,max:1000}));
 
 const CORE_PROMISE="My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100% secure encrypted.";
 
-let razorpay;
-try{ razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET}); }catch(e){ console.log("Razorpay keys missing but CORE PROMISE LIVE - health ON"); razorpay={orders:{create:async(o)=>({id:"order_"+Date.now()})}}; }
+let razorpay; let RAZORPAY_LIVE = true;
+try{
+  if(!process.env.RAZORPAY_KEY_ID ||!process.env.RAZORPAY_KEY_SECRET) throw new Error("Keys missing");
+  razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET});
+}catch(e){
+  console.log("Razorpay keys missing but CORE PROMISE LIVE - health ON - TEST MODE");
+  RAZORPAY_LIVE = false;
+  razorpay={orders:{create:async(o)=>({id:"TEST_order_"+Date.now(), testMode:true, note:"Add keys in Render Env to go LIVE"})}};
+}
 
 let USERS={};
 
@@ -82,9 +91,7 @@ const EMERGENCY_MAP={
 };
 function calcRate(count){ if(count<=2) return 99; if(count<=5) return 85; if(count<=9) return 70; return 60; }
 function ccodeFix(cc){ if(!cc) return "+91"; return cc.split(' ')[0]; }
-
-// HEALTH - Sabse upar taaki turant open ho
-app.get('/health',(req,res)=>res.json({ok:true,live:"SECURE ASSISTANT LIVE",corePromise:CORE_PROMISE,time:Date.now()}));
+app.get('/health',(req,res)=>res.json({ok:true,live:"SECURE ASSISTANT LIVE",corePromise:CORE_PROMISE,time:Date.now(), razorpayLive:RAZORPAY_LIVE}));
 app.get('/api/agents',(req,res)=>res.json(AGENTS));
 app.get('/api/languages',(req,res)=>res.json({languages:LANGUAGES,countryCodes:COUNTRY_CODES,corePromise:CORE_PROMISE}));
 app.get('/api/categories',(req,res)=>res.json(CATEGORIES));
@@ -93,48 +100,79 @@ app.get('/api/camera/add-methods',(req,res)=>res.json({methods:CAM_METHODS}));
 app.get('/api/cameras/methods',(req,res)=>res.json({methods:CAM_METHODS}));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.post('/api/auth/register',(req,res)=>{ let {phone,email,password,countryCode,language,name}=req.body; if(!phone) return res.status(400).json({error:"Phone required"}); USERS[phone]={phone,email,password,countryCode:ccodeFix(countryCode),language,name,created:Date.now(),storageUsed:0,location:{lat:null,lng:null,permission:false},capsules:[]}; res.json({success:true,message:"Firebase Auth Phone OTP Google Biometric Registered",user:USERS[phone],corePromise:CORE_PROMISE}); });
-app.post('/api/register',(req,res)=>{ let {phone,email,password,countryCode,language,name}=req.body; USERS[phone]={phone,email,password,countryCode:ccodeFix(countryCode),language,name,created:Date.now(),storageUsed:0,location:{},capsules:[]}; res.json({success:true,user:USERS[phone]}); });
+app.post('/api/auth/register',(req,res)=>{
+  let {phone,email,password,countryCode,language,name}=req.body;
+  if(!phone) return res.status(400).json({error:"Phone required"});
+  if(phone.length < 8) return res.status(400).json({error:"Invalid phone"});
+  USERS[phone]={phone,email,password: password? crypto.createHash('sha256').update(password).digest('hex') : undefined,countryCode:ccodeFix(countryCode),language,name,created:Date.now(),storageUsed:0,location:{lat:null,lng:null,permission:false},capsules:[]};
+  res.json({success:true,message:"Firebase Auth Phone OTP Google Biometric Registered",user:USERS[phone],corePromise:CORE_PROMISE});
+});
+app.post('/api/register',(req,res)=>{
+  let {phone,email,password,countryCode,language,name}=req.body;
+  USERS[phone]={phone,email,password: password? crypto.createHash('sha256').update(password).digest('hex') : undefined,countryCode:ccodeFix(countryCode),language,name,created:Date.now(),storageUsed:0,location:{},capsules:[]};
+  res.json({success:true,user:USERS[phone]});
+});
 app.post('/api/auth/update-profile',(req,res)=>{ let {phone,newPhone,newEmail,location}=req.body; if(!USERS[phone]) return res.status(404).json({error:"User not found"}); if(newPhone){ USERS[newPhone]={...USERS[phone],phone:newPhone}; delete USERS[phone]; phone=newPhone; } if(newEmail) USERS[phone].email=newEmail; if(location) USERS[phone].location=location; res.json({success:true,user:USERS[phone]}); });
 app.post('/api/payment/calculate',(req,res)=>{ let {cameraCount,totalCameraCount,locations}=req.body; let count=totalCameraCount||cameraCount||1; if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0); let per=calcRate(count); res.json({count,perCamera:per,total:count*per,corePromise:CORE_PROMISE}); });
 app.post('/api/calculatePrice',(req,res)=>{ let {cameraCount}=req.body; let per=calcRate(cameraCount); res.json({count:cameraCount,perCamera:per,total:cameraCount*per}); });
-app.post('/api/payment/generate-qr', async (req,res)=>{ try{ let {cameraCount,totalCameraCount,locations}=req.body; let count=totalCameraCount||cameraCount||1; if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0); let per=calcRate(count); let amount=count*per*100; let order=await razorpay.orders.create({amount,currency:'INR',receipt:'rec_'+Date.now()}); res.json({orderId:order.id,keyId:process.env.RAZORPAY_KEY_ID,count,total:count*per,locations,corePromise:CORE_PROMISE}); }catch(e){ res.status(500).json({error:e.message}); } });
-app.post('/api/payment/verify',(req,res)=>{ let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body; let body=razorpay_order_id+"|"+razorpay_payment_id; let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex'); if(expected===razorpay_signature) res.json({success:true,message:"100% Signature Verify by Abdul Samad App ON",corePromise:CORE_PROMISE}); else res.json({success:false,error:"Signature FAIL hack blocked"}); });
-app.post('/api/verifyPayment',(req,res)=>{ let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body; let body=razorpay_order_id+"|"+razorpay_payment_id; let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex'); if(expected===razorpay_signature) res.json({success:true,message:"Verified App ON"}); else res.json({success:false,error:"FAIL"}); });
-
-// ABDUL FULL EXPERT - Advance wala - Sab use kar payega
+app.post('/api/payment/generate-qr', async (req,res)=>{
+  try{
+    if(!RAZORPAY_LIVE) return res.status(503).json({error:"Razorpay TEST mode - Add keys in Render to go LIVE", corePromise:CORE_PROMISE});
+    let {cameraCount,totalCameraCount,locations}=req.body; let count=totalCameraCount||cameraCount||1; if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0); let per=calcRate(count); let amount=count*per*100; let order=await razorpay.orders.create({amount,currency:'INR',receipt:'rec_'+Date.now()}); res.json({orderId:order.id,keyId:process.env.RAZORPAY_KEY_ID,count,total:count*per,locations,corePromise:CORE_PROMISE});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+app.post('/api/payment/verify',(req,res)=>{
+  let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body;
+  if(!razorpay_order_id ||!razorpay_payment_id ||!razorpay_signature) return res.status(400).json({success:false,error:"Missing fields"});
+  let body=razorpay_order_id+"|"+razorpay_payment_id;
+  let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
+  let isValid = false;
+  try{ isValid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature)); }catch{ isValid = false; }
+  if(isValid) res.json({success:true,message:"100% Signature Verify by Abdul Samad App ON",corePromise:CORE_PROMISE});
+  else res.json({success:false,error:"Signature FAIL hack blocked"});
+});
+app.post('/api/verifyPayment',(req,res)=>{
+  let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body;
+  let body=razorpay_order_id+"|"+razorpay_payment_id;
+  let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
+  let isValid = false;
+  try{ isValid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature)); }catch{ isValid = false; }
+  if(isValid) res.json({success:true,message:"Verified App ON"});
+  else res.json({success:false,error:"FAIL"});
+});
 app.post('/api/chat',(req,res)=>{
   let {message,language,categoryId}=req.body;
   let msg=(message||"").toLowerCase();
   let cat=CATEGORIES.find(c=> c.id==categoryId) || CATEGORIES.find(c=> msg.includes(c.name.split(' ')[0].toLowerCase())) || CATEGORIES[0];
   let tools=cat.toolIds.map(id=> AI_TOOLS.find(t=>t.id==id)?.name || "AI Tool").join(', ');
-
   let reply=`Abdul Wahab - Main Brain:
 Have a nice day, Take care, You are doing great! 😊
-
 Aapne bola: "${message}"
-
 MAIN EXPERT: ${cat.name}
 Sub: ${cat.subCategories.join(', ')}
 Expert Features: ${cat.expertFeatures.join(', ')}
-
 SOLUTION (Real Click Proof):
 1. Tools Use Karo: ${tools}
 2. Daily Report: Kaun aaya loyal history real photo proof before 2:15 incident 2:18 after 2:20
 3. Business Growth: ${cat.name} me ${cat.expertFeatures[0]} se security tight, customer counting se peak time.
-
 NOTICE 🔔:
 Kya aapko help chahiye?
 Kya mai aapke ${cat.name} business ko badhane me kuch bolu?
 Saman kahan se lana hai best source?
 Customer kaise badhaye?
-
 Bolo bhai, kya help karu? ${CORE_PROMISE}`;
-
   res.json({replyPureEnglish:reply, category:cat, tools:tools, corePromise:CORE_PROMISE});
 });
-
-app.post('/api/video/upload-analyze',(req,res)=>{ let {phone,videoSize,fileName}=req.body; if(phone&&USERS[phone]){ USERS[phone].storageUsed=(USERS[phone].storageUsed||0)+(videoSize||0); USERS[phone].capsules.push({id:"cap_"+Date.now(),fileName,size:videoSize,time:Date.now()}); } res.json({success:true,message:"Video uploaded capsule saved encrypted 1 year. Deal extracted what happened where with time proof "+fileName, capsuleId:"cap_"+Date.now(), storageUsed:USERS[phone]?.storageUsed||videoSize, corePromise:CORE_PROMISE}); });
+app.post('/api/video/upload-analyze',upload.single('video'),(req,res)=>{
+  let {phone,fileName}=req.body;
+  let videoSize=req.file? req.file.size : 0;
+  let fName=fileName||req.file?.originalname||"video";
+  if(phone&&USERS[phone]){
+    USERS[phone].storageUsed=(USERS[phone].storageUsed||0)+videoSize;
+    USERS[phone].capsules.push({id:"cap_"+Date.now(),fileName:fName,size:videoSize,time:Date.now()});
+  }
+  res.json({success:true,message:"Video uploaded capsule saved encrypted 1 year. Deal extracted what happened where with time proof "+fName, capsuleId:"cap_"+Date.now(), storageUsed:USERS[phone]?.storageUsed||videoSize, corePromise:CORE_PROMISE});
+});
 app.post('/api/location/update',(req,res)=>{ let {phone,lat,lng}=req.body; if(USERS[phone]) USERS[phone].location={lat,lng,permission:true,updated:Date.now()}; res.json({success:true,message:"Location permission granted saved"}); });
 app.post('/api/emergency/action',(req,res)=>{
 let {phone,emergencyType}=req.body;
@@ -146,7 +184,7 @@ let liveLink=`https://maps.google.com/?q=${user.location?.lat||0},${user.locatio
 let smsText=`EMERGENCY ${emergencyType} at ${user.location?.lat},${user.location?.lng} Help! Live: ${liveLink} CORE PROMISE: ${CORE_PROMISE}`;
 res.json({success:true, country:map.country, countryCode:cc, emergencyType, emergencyNumber:num, location:user.location, liveLink, smsText, message:`Emergency ${emergencyType} - Country ${map.country} ${cc} - Number ${num} - Call+SMS+WhatsApp with permission - Real photo proof - ${CORE_PROMISE}`});
 });
-app.post('/api/sms/send',(req,res)=>{ let {phone,message}=req.body; console.log(`SMS to ${phone}: ${message}`); res.json({success:true,message:"SMS sent SIM offline backup "+CORE_PROMISE}); });
-app.get('/',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
+app.post('/api/sms/send',(req,res)=>{ let {phone,message}=req.body; console.log(`SMS to ${phone}: [REDACTED FOR PRIVACY] ${CORE_PROMISE}`); res.json({success:true,message:"SMS sent SIM offline backup "+CORE_PROMISE}); });
+app.get('/',(req,res)=>res.sendFile(path.join(__dirname, 'public','index.html')));
 const PORT=process.env.PORT||10000;
 app.listen(PORT,'0.0.0.0',()=>console.log('SECURE ASSISTANT LIVE '+PORT));
