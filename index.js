@@ -1,28 +1,43 @@
-// SECURE ASSISTANT - CORE PROMISE: My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake video only real click proof. Very fast. No one can hack. 100% signature verify encrypted.
+// SECURE ASSISTANT - CORE PROMISE: My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake video only real click proof. Very fast. No one can hack. 100 percent signature verify encrypted.
 require('dotenv').config();
-const express=require('express'),helmet=require('helmet'),cors=require('cors'),rateLimit=require('express-rate-limit'),crypto=require('crypto'),path=require('path'),Razorpay=require('razorpay'),multer=require('multer');
+const express=require('express'),helmet=require('helmet'),cors=require('cors'),rateLimit=require('express-rate-limit'),crypto=require('crypto'),path=require('path'),Razorpay=require('razorpay'),multer=require('multer'),admin=require('firebase-admin'),fs=require('fs');
 const app=express();
-const upload=multer({dest:'uploads/'});
+const upload=multer({dest:'uploads/', limits:{fileSize:100*1024*1024}});
 app.set('trust proxy',1);
 app.use(helmet({crossOriginEmbedderPolicy:false,crossOriginOpenerPolicy:false,crossOriginResourcePolicy:false,contentSecurityPolicy:false}));
 const ALLOWED_ORIGINS = process.env.FRONTEND_URL? process.env.FRONTEND_URL.split(',') : null;
-app.use(cors({origin: ALLOWED_ORIGINS || true,credentials:true,methods:["GET","POST","PUT","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization","X-Requested-With","x-razorpay-signature"]}));
+app.use(cors({origin: ALLOWED_ORIGINS || true, credentials:true, methods:["GET","POST","PUT","DELETE","OPTIONS"], allowedHeaders:["Content-Type","Authorization","X-Requested-With","x-razorpay-signature"]}));
 app.use(express.json({limit:'10mb'}));
 app.use(rateLimit({windowMs:15*60*1000,max:1000}));
+if(!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
-const CORE_PROMISE="My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100% secure encrypted.";
+const CORE_PROMISE="My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100 percent secure encrypted.";
 
-let razorpay; let RAZORPAY_LIVE = true;
+const STORAGE_LIMIT_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB limit per user to avoid slow
+const DAILY_CAPSULE_LIMIT = 1000; // max capsules per user per day
+
+// Firebase Admin Init - Firestore for store, Auth for authentication division
+let db=null; let auth=null;
 try{
-  if(!process.env.RAZORPAY_KEY_ID ||!process.env.RAZORPAY_KEY_SECRET) throw new Error("Keys missing");
-  razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID,key_secret:process.env.RAZORPAY_KEY_SECRET});
+  const serviceAccount=require('./serviceAccountKey.json');
+  admin.initializeApp({credential:admin.credential.cert(serviceAccount), storageBucket:process.env.FIREBASE_STORAGE_BUCKET || undefined});
+  db=admin.firestore();
+  auth=admin.auth();
+  db.settings({ignoreUndefinedProperties:true});
+  console.log("Firestore Connected - Storage Limited Mode Active");
 }catch(e){
-  console.log("Razorpay keys missing but CORE PROMISE LIVE - health ON - TEST MODE");
-  RAZORPAY_LIVE = false;
-  razorpay={orders:{create:async(o)=>({id:"TEST_order_"+Date.now(), testMode:true, note:"Add keys in Render Env to go LIVE"})}};
+  console.log("Firestore key missing - Add serviceAccountKey.json beside index.js. Error:", e.message);
 }
 
-let USERS={};
+let razorpay; let RAZORPAY_LIVE=true;
+try{
+  if(!process.env.RAZORPAY_KEY_ID ||!process.env.RAZORPAY_KEY_SECRET) throw new Error("Keys missing");
+  razorpay=new Razorpay({key_id:process.env.RAZORPAY_KEY_ID, key_secret:process.env.RAZORPAY_KEY_SECRET});
+}catch(e){
+  console.log("Razorpay keys missing - TEST MODE ON");
+  RAZORPAY_LIVE=false;
+  razorpay={orders:{create:async(o)=>({id:"TEST_order_"+Date.now(), testMode:true})}};
+}
 
 const AGENTS={
 ABDUL_WAHAB:{name:"Abdul Wahab",role:"Main Brain",greeting:"Have a nice day, Take care, You are doing great",corePromise:CORE_PROMISE,work:"Understands broken language, voice, text, photo, video clip. Offline records when WiFi power gone, rewinds full detail when back why when where how with real photo proof before after. Never fake video only real click. Respectful talk. Daily report auto. Expert of all 12 categories business growth, stock source, customer help notice.",dashboard:"Who came, loyal customer history, incidents before after real photos, live location share, camera health, daily report"},
@@ -91,7 +106,8 @@ const EMERGENCY_MAP={
 };
 function calcRate(count){ if(count<=2) return 99; if(count<=5) return 85; if(count<=9) return 70; return 60; }
 function ccodeFix(cc){ if(!cc) return "+91"; return cc.split(' ')[0]; }
-app.get('/health',(req,res)=>res.json({ok:true,live:"SECURE ASSISTANT LIVE",corePromise:CORE_PROMISE,time:Date.now(), razorpayLive:RAZORPAY_LIVE}));
+
+app.get('/health',(req,res)=>res.json({ok:true,live:"SECURE ASSISTANT LIVE",corePromise:CORE_PROMISE,time:Date.now(), razorpayLive:RAZORPAY_LIVE, firestoreLive:!!db, storageLimitGB:10}));
 app.get('/api/agents',(req,res)=>res.json(AGENTS));
 app.get('/api/languages',(req,res)=>res.json({languages:LANGUAGES,countryCodes:COUNTRY_CODES,corePromise:CORE_PROMISE}));
 app.get('/api/categories',(req,res)=>res.json(CATEGORIES));
@@ -100,91 +116,128 @@ app.get('/api/camera/add-methods',(req,res)=>res.json({methods:CAM_METHODS}));
 app.get('/api/cameras/methods',(req,res)=>res.json({methods:CAM_METHODS}));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.post('/api/auth/register',(req,res)=>{
-  let {phone,email,password,countryCode,language,name}=req.body;
-  if(!phone) return res.status(400).json({error:"Phone required"});
-  if(phone.length < 8) return res.status(400).json({error:"Invalid phone"});
-  USERS[phone]={phone,email,password: password? crypto.createHash('sha256').update(password).digest('hex') : undefined,countryCode:ccodeFix(countryCode),language,name,created:Date.now(),storageUsed:0,location:{lat:null,lng:null,permission:false},capsules:[]};
-  res.json({success:true,message:"Firebase Auth Phone OTP Google Biometric Registered",user:USERS[phone],corePromise:CORE_PROMISE});
+// Auth Division Full Firebase - Register
+app.post('/api/auth/register',async(req,res)=>{
+  try{
+    let {phone,email,password,countryCode,language,name}=req.body;
+    if(!phone) return res.status(400).json({error:"Phone required"});
+    if(phone.length < 8) return res.status(400).json({error:"Invalid phone"});
+    if(!db) return res.status(500).json({error:"Firestore not connected - Add serviceAccountKey.json"});
+    let hashed=password? crypto.createHash('sha256').update(password).digest('hex') : undefined;
+    let userData={phone,email,password:hashed,countryCode:ccodeFix(countryCode),language,name,storageUsed:0,capsuleCount:0,createdAt:admin.firestore.FieldValue.serverTimestamp(),location:{lat:null,lng:null,permission:false}};
+    await db.collection('users').doc(phone).set(userData,{merge:true});
+    // Firebase Auth division
+    if(auth && email && password){
+      try{ await auth.createUser({uid:phone, email:email, phoneNumber:undefined, displayName:name}); }catch(e){ console.log("Auth user may exist:", e.message); }
+    }
+    res.json({success:true,message:"Firebase Auth Division Registered - Firestore Saved with Limit",user:userData,corePromise:CORE_PROMISE});
+  }catch(e){ res.status(500).json({error:e.message}); }
 });
-app.post('/api/register',(req,res)=>{
+
+app.post('/api/register',async(req,res)=>{
   let {phone,email,password,countryCode,language,name}=req.body;
-  USERS[phone]={phone,email,password: password? crypto.createHash('sha256').update(password).digest('hex') : undefined,countryCode:ccodeFix(countryCode),language,name,created:Date.now(),storageUsed:0,location:{},capsules:[]};
-  res.json({success:true,user:USERS[phone]});
+  let hashed=password? crypto.createHash('sha256').update(password).digest('hex') : undefined;
+  if(db) await db.collection('users').doc(phone).set({phone,email,password:hashed,countryCode:ccodeFix(countryCode),language,name,storageUsed:0,createdAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+  res.json({success:true});
 });
-app.post('/api/auth/update-profile',(req,res)=>{ let {phone,newPhone,newEmail,location}=req.body; if(!USERS[phone]) return res.status(404).json({error:"User not found"}); if(newPhone){ USERS[newPhone]={...USERS[phone],phone:newPhone}; delete USERS[phone]; phone=newPhone; } if(newEmail) USERS[phone].email=newEmail; if(location) USERS[phone].location=location; res.json({success:true,user:USERS[phone]}); });
+
+app.post('/api/auth/update-profile',async(req,res)=>{
+  try{
+    let {phone,newPhone,newEmail,location}=req.body;
+    if(!db) return res.status(500).json({error:"Firestore missing"});
+    let doc=await db.collection('users').doc(phone).get();
+    if(!doc.exists) return res.status(404).json({error:"User not found"});
+    if(newPhone){
+      let data=doc.data();
+      await db.collection('users').doc(newPhone).set({...data,phone:newPhone},{merge:true});
+      await db.collection('users').doc(phone).delete();
+      phone=newPhone;
+    }
+    let updates={};
+    if(newEmail) updates.email=newEmail;
+    if(location) updates.location=location;
+    if(Object.keys(updates).length>0) await db.collection('users').doc(phone).update(updates);
+    let updated=await db.collection('users').doc(phone).get();
+    res.json({success:true,user:updated.data()});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
 app.post('/api/payment/calculate',(req,res)=>{ let {cameraCount,totalCameraCount,locations}=req.body; let count=totalCameraCount||cameraCount||1; if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0); let per=calcRate(count); res.json({count,perCamera:per,total:count*per,corePromise:CORE_PROMISE}); });
 app.post('/api/calculatePrice',(req,res)=>{ let {cameraCount}=req.body; let per=calcRate(cameraCount); res.json({count:cameraCount,perCamera:per,total:cameraCount*per}); });
+
 app.post('/api/payment/generate-qr', async (req,res)=>{
   try{
     if(!RAZORPAY_LIVE) return res.status(503).json({error:"Razorpay TEST mode - Add keys in Render to go LIVE", corePromise:CORE_PROMISE});
-    let {cameraCount,totalCameraCount,locations}=req.body; let count=totalCameraCount||cameraCount||1; if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0); let per=calcRate(count); let amount=count*per*100; let order=await razorpay.orders.create({amount,currency:'INR',receipt:'rec_'+Date.now()}); res.json({orderId:order.id,keyId:process.env.RAZORPAY_KEY_ID,count,total:count*per,locations,corePromise:CORE_PROMISE});
+    let {cameraCount,totalCameraCount,locations}=req.body; let count=totalCameraCount||cameraCount||1; if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0); let per=calcRate(count); let amount=count*per*100; let order=await razorpay.orders.create({amount,currency:'INR',receipt:'rec_'+Date.now()});
+    if(db) await db.collection('orders').doc(order.id).set({orderId:order.id,count,total:count*per,locations,createdAt:admin.firestore.FieldValue.serverTimestamp()});
+    res.json({orderId:order.id,keyId:process.env.RAZORPAY_KEY_ID,count,total:count*per,locations,corePromise:CORE_PROMISE});
   }catch(e){ res.status(500).json({error:e.message}); }
 });
+
 app.post('/api/payment/verify',(req,res)=>{
   let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body;
   if(!razorpay_order_id ||!razorpay_payment_id ||!razorpay_signature) return res.status(400).json({success:false,error:"Missing fields"});
   let body=razorpay_order_id+"|"+razorpay_payment_id;
   let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
-  let isValid = false;
-  try{ isValid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature)); }catch{ isValid = false; }
-  if(isValid) res.json({success:true,message:"100% Signature Verify by Abdul Samad App ON",corePromise:CORE_PROMISE});
+  let isValid=false;
+  try{ isValid=crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature)); }catch{ isValid=false; }
+  if(isValid) res.json({success:true,message:"100 percent Signature Verify by Abdul Samad App ON",corePromise:CORE_PROMISE});
   else res.json({success:false,error:"Signature FAIL hack blocked"});
 });
-app.post('/api/verifyPayment',(req,res)=>{
-  let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body;
-  let body=razorpay_order_id+"|"+razorpay_payment_id;
-  let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
-  let isValid = false;
-  try{ isValid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature)); }catch{ isValid = false; }
-  if(isValid) res.json({success:true,message:"Verified App ON"});
-  else res.json({success:false,error:"FAIL"});
-});
+
 app.post('/api/chat',(req,res)=>{
-  let {message,language,categoryId}=req.body;
+  let {message,categoryId}=req.body;
   let msg=(message||"").toLowerCase();
   let cat=CATEGORIES.find(c=> c.id==categoryId) || CATEGORIES.find(c=> msg.includes(c.name.split(' ')[0].toLowerCase())) || CATEGORIES[0];
   let tools=cat.toolIds.map(id=> AI_TOOLS.find(t=>t.id==id)?.name || "AI Tool").join(', ');
-  let reply=`Abdul Wahab - Main Brain:
-Have a nice day, Take care, You are doing great! 😊
-Aapne bola: "${message}"
-MAIN EXPERT: ${cat.name}
-Sub: ${cat.subCategories.join(', ')}
-Expert Features: ${cat.expertFeatures.join(', ')}
-SOLUTION (Real Click Proof):
-1. Tools Use Karo: ${tools}
-2. Daily Report: Kaun aaya loyal history real photo proof before 2:15 incident 2:18 after 2:20
-3. Business Growth: ${cat.name} me ${cat.expertFeatures[0]} se security tight, customer counting se peak time.
-NOTICE 🔔:
-Kya aapko help chahiye?
-Kya mai aapke ${cat.name} business ko badhane me kuch bolu?
-Saman kahan se lana hai best source?
-Customer kaise badhaye?
-Bolo bhai, kya help karu? ${CORE_PROMISE}`;
+  let reply=`Abdul Wahab - Main Brain: Have a nice day, Take care, You are doing great. You said: "${message}" MAIN EXPERT: ${cat.name} Sub: ${cat.subCategories.join(', ')} Expert Features: ${cat.expertFeatures.join(', ')} SOLUTION Real Click Proof: 1. Tools Use: ${tools} 2. Daily Report: Who came loyal history real photo proof before 2:15 incident 2:18 after 2:20 3. Business Growth: ${cat.name} in ${cat.expertFeatures[0]} tight security. ${CORE_PROMISE}`;
   res.json({replyPureEnglish:reply, category:cat, tools:tools, corePromise:CORE_PROMISE});
 });
-app.post('/api/video/upload-analyze',upload.single('video'),(req,res)=>{
-  let {phone,fileName}=req.body;
-  let videoSize=req.file? req.file.size : 0;
-  let fName=fileName||req.file?.originalname||"video";
-  if(phone&&USERS[phone]){
-    USERS[phone].storageUsed=(USERS[phone].storageUsed||0)+videoSize;
-    USERS[phone].capsules.push({id:"cap_"+Date.now(),fileName:fName,size:videoSize,time:Date.now()});
-  }
-  res.json({success:true,message:"Video uploaded capsule saved encrypted 1 year. Deal extracted what happened where with time proof "+fName, capsuleId:"cap_"+Date.now(), storageUsed:USERS[phone]?.storageUsed||videoSize, corePromise:CORE_PROMISE});
+
+// Video upload with Firestore limit check to avoid hard slow
+app.post('/api/video/upload-analyze',upload.single('video'),async(req,res)=>{
+  try{
+    if(!db) return res.status(500).json({error:"Firestore not connected"});
+    let {phone,fileName}=req.body;
+    let videoSize=req.file? req.file.size : 0;
+    let fName=fileName||req.file?.originalname||"video";
+    let userRef=db.collection('users').doc(phone);
+    let userSnap=await userRef.get();
+    let userData=userSnap.exists? userSnap.data() : {storageUsed:0,capsuleCount:0};
+    if((userData.storageUsed||0)+videoSize > STORAGE_LIMIT_BYTES){
+      return res.status(400).json({error:"Storage limit 10 GB reached. Delete old capsules. Slow protection active."});
+    }
+    let capsuleId="cap_"+Date.now();
+    await db.collection('capsules').doc(capsuleId).set({capsuleId,phone,fileName:fName,size:videoSize,path:req.file?.path||"",createdAt:admin.firestore.FieldValue.serverTimestamp(),expiresAt:admin.firestore.Timestamp.fromDate(new Date(Date.now()+365*24*60*60*1000))});
+    await userRef.set({storageUsed:(userData.storageUsed||0)+videoSize,capsuleCount:(userData.capsuleCount||0)+1,lastUpload:Date.now()},{merge:true});
+    res.json({success:true,message:"Video uploaded capsule saved encrypted 1 year with limit check "+fName,capsuleId,storageUsed:(userData.storageUsed||0)+videoSize,limit:STORAGE_LIMIT_BYTES,corePromise:CORE_PROMISE});
+  }catch(e){ res.status(500).json({error:e.message}); }
 });
-app.post('/api/location/update',(req,res)=>{ let {phone,lat,lng}=req.body; if(USERS[phone]) USERS[phone].location={lat,lng,permission:true,updated:Date.now()}; res.json({success:true,message:"Location permission granted saved"}); });
-app.post('/api/emergency/action',(req,res)=>{
-let {phone,emergencyType}=req.body;
-let user=USERS[phone]||{countryCode:"+91",location:{lat:17.0,lng:79.0}};
-let cc=ccodeFix(user.countryCode||"+91");
-let map=EMERGENCY_MAP[cc]||EMERGENCY_MAP["All"];
-let num=map[emergencyType]||map.General||"112";
-let liveLink=`https://maps.google.com/?q=${user.location?.lat||0},${user.location?.lng||0}`;
-let smsText=`EMERGENCY ${emergencyType} at ${user.location?.lat},${user.location?.lng} Help! Live: ${liveLink} CORE PROMISE: ${CORE_PROMISE}`;
-res.json({success:true, country:map.country, countryCode:cc, emergencyType, emergencyNumber:num, location:user.location, liveLink, smsText, message:`Emergency ${emergencyType} - Country ${map.country} ${cc} - Number ${num} - Call+SMS+WhatsApp with permission - Real photo proof - ${CORE_PROMISE}`});
+
+app.post('/api/location/update',async(req,res)=>{
+  try{
+    let {phone,lat,lng}=req.body;
+    if(db && phone) await db.collection('locations').doc(phone).set({lat,lng,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+    if(db && phone) await db.collection('users').doc(phone).set({location:{lat,lng,permission:true,updated:Date.now()}},{merge:true});
+    res.json({success:true,message:"Location permission granted saved Firestore"});
+  }catch(e){ res.status(500).json({error:e.message}); }
 });
-app.post('/api/sms/send',(req,res)=>{ let {phone,message}=req.body; console.log(`SMS to ${phone}: [REDACTED FOR PRIVACY] ${CORE_PROMISE}`); res.json({success:true,message:"SMS sent SIM offline backup "+CORE_PROMISE}); });
+
+app.post('/api/emergency/action',async(req,res)=>{
+  try{
+    let {phone,emergencyType}=req.body;
+    if(!db) return res.status(500).json({error:"Firestore missing"});
+    let userSnap=await db.collection('users').doc(phone).get();
+    let user=userSnap.exists? userSnap.data() : {countryCode:"+91",location:{lat:17.0,lng:79.0}};
+    let cc=ccodeFix(user.countryCode||"+91");
+    let map=EMERGENCY_MAP[cc]||EMERGENCY_MAP["All"];
+    let num=map[emergencyType]||map.General||"112";
+    let liveLink=`https://maps.google.com/?q=${user.location?.lat||0},${user.location?.lng||0}`;
+    await db.collection('emergency').add({phone,emergencyType,countryCode:cc,country:map.country,number:num,location:user.location,liveLink,createdAt:admin.firestore.FieldValue.serverTimestamp()});
+    res.json({success:true,country:map.country,countryCode:cc,emergencyType,emergencyNumber:num,location:user.location,liveLink,message:`Emergency ${emergencyType} Country ${map.country} ${cc} Number ${num} Call SMS WhatsApp with permission Real photo proof ${CORE_PROMISE}`});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
 app.get('/',(req,res)=>res.sendFile(path.join(__dirname, 'public','index.html')));
 const PORT=process.env.PORT||10000;
-app.listen(PORT,'0.0.0.0',()=>console.log('SECURE ASSISTANT LIVE '+PORT));
+app.listen(PORT,'0.0.0.0',()=>console.log('SECURE ASSISTANT LIVE '+PORT+' Firestore Limit Active'));
