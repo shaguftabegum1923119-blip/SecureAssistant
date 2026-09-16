@@ -20,12 +20,13 @@ try{
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     console.log("Found FIREBASE_SERVICE_ACCOUNT env, parsing...");
     let raw = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
-    try {
-      serviceAccount = JSON.parse(raw);
-      if(typeof serviceAccount === 'string') serviceAccount = JSON.parse(serviceAccount);
-    } catch(e) {
-      // If env was double-stringified
-      serviceAccount = JSON.parse(raw.slice(1,-1));
+    // Fixed: Removed dangerous raw.slice(1,-1) which was breaking JSON
+    if (raw.startsWith("'") && raw.endsWith("'")) {
+      raw = raw.slice(1, -1);
+    }
+    serviceAccount = JSON.parse(raw);
+    if(typeof serviceAccount === 'string') {
+      serviceAccount = JSON.parse(serviceAccount);
     }
     if(serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
