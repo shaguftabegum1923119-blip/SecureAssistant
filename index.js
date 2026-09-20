@@ -2,6 +2,7 @@
 // My AI agents never lie, my app never lies and my app never leaks customer privacy.
 // Never fake video, only real click with time before after proof. Very fast. No one can hack. 100% signature verify encrypted.
 
+require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -11,6 +12,7 @@ const multer = require('multer');
 const Razorpay = require('razorpay');
 const admin = require('firebase-admin');
 const fs = require('fs');
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -43,16 +45,22 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 150, standardHeaders: true })
 
 const CORE_PROMISE = "My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100% secure encrypted.";
 
-// 2. FIREBASE INIT - 100% SECURE - NO KEY IN CODE - ONLY FROM ENV BASE64
+// 2. FIREBASE INIT - 100% SECURE - NO KEY IN CODE - ONLY FROM ENV BASE64 - NOW ALSO SUPPORTS GOOGLE_APPLICATION_CREDENTIALS FILE PATH
 let db = null;
 let firestoreLive = false;
 try {
-  let saRaw = (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT || '').trim();
+  let saRaw = (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS || '').trim();
   if (!saRaw) throw new Error('FIREBASE_SERVICE_ACCOUNT ENV missing');
   saRaw = saRaw.replace(/^["']|["']$/g, '').trim();
-  if (!saRaw.startsWith('{')) {
+
+  // FIX ADDED - If saRaw is a file path like./serviceAccount.json then read file
+  if (saRaw.endsWith('.json')) {
+    console.log("Reading service account from file path:", saRaw);
+    saRaw = fs.readFileSync(saRaw, 'utf8');
+  } else if (!saRaw.startsWith('{')) {
     saRaw = Buffer.from(saRaw, 'base64').toString('utf8');
   }
+
   saRaw = saRaw.trim();
   if ((saRaw.startsWith("'") && saRaw.endsWith("'")) || (saRaw.startsWith('"') && saRaw.endsWith('"'))) saRaw = saRaw.slice(1, -1);
   let sa = JSON.parse(saRaw);

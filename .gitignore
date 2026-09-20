@@ -2,4 +2,4 @@ node_modules
 .env
 dist
 uploads
-assistant-74894-firebase-adminsdk-fbsvc-139a7f2c46.json
+serviceAccount.json
