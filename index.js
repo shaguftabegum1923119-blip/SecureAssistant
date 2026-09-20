@@ -45,7 +45,7 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 150, standardHeaders: true })
 
 const CORE_PROMISE = "My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100% secure encrypted.";
 
-// 2. FIREBASE INIT - 100% SECURE - NO KEY IN CODE - ONLY FROM ENV BASE64 - NOW ALSO SUPPORTS GOOGLE_APPLICATION_CREDENTIALS FILE PATH
+// 2. FIREBASE INIT - 100% SECURE - NO KEY IN CODE - ONLY FROM ENV BASE64 - NOW ALSO SUPPORTS GOOGLE_APPLICATION_CREDENTIALS FILE PATH - FIXED TO ONLY READ serviceAccount.json NOT package.json
 let db = null;
 let firestoreLive = false;
 try {
@@ -53,8 +53,9 @@ try {
   if (!saRaw) throw new Error('FIREBASE_SERVICE_ACCOUNT ENV missing');
   saRaw = saRaw.replace(/^["']|["']$/g, '').trim();
 
-  // FIX ADDED - If saRaw is a file path like./serviceAccount.json then read file
-  if (saRaw.endsWith('.json')) {
+  // FIXED - Only read if it is serviceAccount.json file, NOT package.json or package-lock.json
+  // Check 1: ends with.json AND contains word serviceaccount AND file exists
+  if (saRaw.toLowerCase().endsWith('.json') && saRaw.toLowerCase().includes('serviceaccount') && fs.existsSync(saRaw)) {
     console.log("Reading service account from file path:", saRaw);
     saRaw = fs.readFileSync(saRaw, 'utf8');
   } else if (!saRaw.startsWith('{')) {
