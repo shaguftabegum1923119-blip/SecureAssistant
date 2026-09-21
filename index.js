@@ -12,14 +12,17 @@ const multer = require('multer');
 const Razorpay = require('razorpay');
 const admin = require('firebase-admin');
 const fs = require('fs');
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+const path = require('path');
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
 
 const app = express();
 app.set('trust proxy', 1);
 
 // 1. SECURITY - NO OPEN CORS - Hack Proof
 app.use(helmet({
-  contentSecurityPolicy: false, // keep false for FlutterFlow, but helmet ON
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: true,
   hsts: { maxAge: 31536000, includeSubDomains: true }
 }));
@@ -27,8 +30,12 @@ app.use(helmet({
 const ALLOWED_ORIGINS = (process.env.FRONTEND_URL || '').split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGINS.length === 0) return cb(null, true); // allow during dev, lock in prod via ENV
+    if (!origin) {
+      return cb(null, true);
+    }
+    if (ALLOWED_ORIGINS.length === 0) {
+      return cb(null, true);
+    }
     if (ALLOWED_ORIGINS.includes(origin) || origin.includes('flutterflow') || origin.includes('firebaseapp') || origin.includes('web.app')) {
       return cb(null, true);
     }
@@ -45,43 +52,96 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 150, standardHeaders: true })
 
 const CORE_PROMISE = "My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100% secure encrypted.";
 
-// 2. FIREBASE INIT - 100% SECURE - NO KEY IN CODE - ONLY FROM ENV BASE64 - NOW ALSO SUPPORTS GOOGLE_APPLICATION_CREDENTIALS FILE PATH - FIXED TO ONLY READ serviceAccount.json NOT package.json
+// 2. FIREBASE INIT - 100% SECURE - FIXED VERSION - ROBUST ERROR CATCH - ALL BRACKETS CLOSED + FIRESTORE FIX
 let db = null;
 let firestoreLive = false;
 try {
   let saRaw = (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT || process.env.GOOGLE_APPLICATION_CREDENTIALS || '').trim();
-  if (!saRaw) throw new Error('FIREBASE_SERVICE_ACCOUNT ENV missing');
+  if (!saRaw) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT ENV missing - Set GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json in.env');
+  }
   saRaw = saRaw.replace(/^["']|["']$/g, '').trim();
 
-  // FIXED - Only read if it is serviceAccount.json file, NOT package.json or package-lock.json
-  // Check 1: ends with.json AND contains word serviceaccount AND file exists
-  if (saRaw.toLowerCase().endsWith('.json') && saRaw.toLowerCase().includes('serviceaccount') && fs.existsSync(saRaw)) {
-    console.log("Reading service account from file path:", saRaw);
-    saRaw = fs.readFileSync(saRaw, 'utf8');
+  if (saRaw.endsWith('.json')) {
+    const fullPath = path.resolve(saRaw);
+    console.log("Reading service account from file path:", fullPath);
+    if (!fs.existsSync(fullPath)) {
+      throw new Error('File not found at: ' + fullPath + ' - Make sure serviceAccount.json exists');
+    }
+    saRaw = fs.readFileSync(fullPath, 'utf8');
   } else if (!saRaw.startsWith('{')) {
+    console.log("Reading service account from BASE64 ENV");
     saRaw = Buffer.from(saRaw, 'base64').toString('utf8');
   }
 
   saRaw = saRaw.trim();
-  if ((saRaw.startsWith("'") && saRaw.endsWith("'")) || (saRaw.startsWith('"') && saRaw.endsWith('"'))) saRaw = saRaw.slice(1, -1);
-  let sa = JSON.parse(saRaw);
-  if (typeof sa === 'string') sa = JSON.parse(sa);
-  if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
-  if (!admin.apps.length) {
-    admin.initializeApp({ credential: admin.credential.cert(sa), storageBucket: process.env.FIREBASE_STORAGE_BUCKET });
+  if ((saRaw.startsWith("'") && saRaw.endsWith("'")) || (saRaw.startsWith('"') && saRaw.endsWith('"'))) {
+    saRaw = saRaw.slice(1, -1);
   }
-  db = admin.firestore();
+
+  let sa = JSON.parse(saRaw);
+  if (typeof sa === 'string') {
+    sa = JSON.parse(sa);
+  }
+
+  // VALIDATION - EASY CATCH
+  if (!sa.private_key) {
+    throw new Error('private_key MISSING in serviceAccount.json');
+  }
+  if (!sa.client_email) {
+    throw new Error('client_email MISSING in serviceAccount.json');
+  }
+  if (!sa.project_id) {
+    throw new Error('project_id MISSING in serviceAccount.json');
+  }
+
+  // FIX private_key newline
+  sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+
+  console.log("Service Account Check - project:", sa.project_id, "email:", sa.client_email, "private_key lines:", sa.private_key.split('\n').length);
+
+  let credential;
+  if (admin.credential && admin.credential.cert) {
+    credential = admin.credential.cert(sa);
+  } else {
+    const { cert } = require('firebase-admin/app');
+    credential = cert(sa);
+  }
+
+  if (!admin.apps || admin.apps.length === 0) {
+    admin.initializeApp({
+      credential: credential,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'assistant-74894.firebasestorage.app'
+    });
+  }
+
+  // FIRESTORE FIX - for new firebase-admin version - brackets closed
+  try {
+    if (typeof admin.firestore === 'function') {
+      db = admin.firestore();
+    } else {
+      const { getFirestore } = require('firebase-admin/firestore');
+      db = getFirestore();
+    }
+  } catch (e) {
+    const { getFirestore } = require('firebase-admin/firestore');
+    db = getFirestore();
+  }
+
   firestoreLive = true;
   console.log("✅ FIREBASE LIVE firestoreLive:true");
 } catch (e) {
   console.log("❌ Firebase init failed firestoreLive:false", e.message);
+  console.log(e.stack);
 }
 
 let razorpay;
 let razorpayLive = false;
 try {
   razorpay = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
-  if (process.env.RAZORPAY_KEY_ID) razorpayLive = true;
+  if (process.env.RAZORPAY_KEY_ID) {
+    razorpayLive = true;
+  }
 } catch (e) {
   razorpay = { orders: { create: async (o) => ({ id: "order_" + Date.now() }) } };
 }
@@ -92,9 +152,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-env';
 async function auth(req, res, next) {
   try {
     const h = req.headers.authorization;
-    if (!h ||!h.startsWith('Bearer ')) return res.status(401).json({ error: "Login required - Bearer token missing" });
+    if (!h ||!h.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Login required - Bearer token missing" });
+    }
     const token = h.split('Bearer ')[1];
-    // Firebase ID Token (Phone, Google, Email)
     const decoded = await admin.auth().verifyIdToken(token);
     req.user = { uid: decoded.uid, phone: decoded.phone_number || decoded.uid, email: decoded.email };
     next();
@@ -207,8 +268,24 @@ const EMERGENCY_MAP = {
 "All":{country:"All World", Fall:"112", Fire:"112", Weapon:"112", Intrusion:"112", General:"112"}
 };
 
-function calcRate(count){ if(count<=2) return 99; if(count<=5) return 85; if(count<=9) return 70; return 60; }
-function ccodeFix(cc){ if(!cc) return "+91"; return cc.split(' ')[0]; }
+function calcRate(count){
+  if(count<=2){
+    return 99;
+  }
+  if(count<=5){
+    return 85;
+  }
+  if(count<=9){
+    return 70;
+  }
+  return 60;
+}
+function ccodeFix(cc){
+  if(!cc){
+    return "+91";
+  }
+  return cc.split(' ')[0];
+}
 
 // ROUTES
 app.get('/health',(req,res)=>res.json({ok:true,live:"SECURE ASSISTANT LIVE",corePromise:CORE_PROMISE,firestoreLive,razorpayLive,time:Date.now(),abdulWahab:"Main Brain LIVE",abdulSamad:"Security LIVE 100% verify"}));
@@ -221,7 +298,9 @@ app.get('/api/cameras/methods',(req,res)=>res.json({methods:CAM_METHODS, corePro
 
 // AUTH - FIREBASE AUTH ONLY - No password save in code
 app.post('/api/auth/register', auth, async(req,res)=>{
-  if(!firestoreLive) return res.status(500).json({error:"Firestore not live"});
+  if(!firestoreLive){
+    return res.status(500).json({error:"Firestore not live"});
+  }
   const {uid, phone, email} = req.user;
   const {countryCode, language, name} = req.body;
   const userData = {
@@ -236,12 +315,20 @@ app.post('/api/auth/register', auth, async(req,res)=>{
 });
 
 app.post('/api/auth/update-profile', auth, async(req,res)=>{
-  if(!firestoreLive) return res.status(500).json({error:"Firestore not live"});
+  if(!firestoreLive){
+    return res.status(500).json({error:"Firestore not live"});
+  }
   const {newEmail, location, name} = req.body;
   const updates = {};
-  if(newEmail) updates.email = newEmail;
-  if(name) updates.name = name;
-  if(location) updates.location = {...location, permission:true, updated:Date.now()};
+  if(newEmail){
+    updates.email = newEmail;
+  }
+  if(name){
+    updates.name = name;
+  }
+  if(location){
+    updates.location = {...location, permission:true, updated:Date.now()};
+  }
   await db.collection('users').doc(req.user.uid).set(updates,{merge:true});
   const snap = await db.collection('users').doc(req.user.uid).get();
   res.json({success:true, user:snap.data()});
@@ -251,13 +338,16 @@ app.post('/api/auth/update-profile', auth, async(req,res)=>{
 app.post('/api/payment/calculate', auth, (req,res)=>{
   let {cameraCount,totalCameraCount,locations}=req.body;
   let count=totalCameraCount||cameraCount||1;
-  if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0);
+  if(locations&&Array.isArray(locations)){
+    count=locations.reduce((s,l)=>s+(l.cameraCount||0),0);
+  }
   let per=calcRate(count);
   res.json({count, perCamera:per, total:count*per, corePromise:CORE_PROMISE});
 });
 
 app.post('/api/calculatePrice', auth, (req,res)=>{
-  let {cameraCount}=req.body; let per=calcRate(cameraCount);
+  let {cameraCount}=req.body;
+  let per=calcRate(cameraCount);
   res.json({count:cameraCount, perCamera:per, total:cameraCount*per, corePromise:CORE_PROMISE});
 });
 
@@ -265,13 +355,19 @@ app.post('/api/payment/generate-qr', auth, async (req,res)=>{
   try{
     let {cameraCount,totalCameraCount,locations}=req.body;
     let count=totalCameraCount||cameraCount||1;
-    if(locations&&Array.isArray(locations)) count=locations.reduce((s,l)=>s+(l.cameraCount||0),0);
+    if(locations&&Array.isArray(locations)){
+      count=locations.reduce((s,l)=>s+(l.cameraCount||0),0);
+    }
     let per=calcRate(count);
     let amount=count*per*100;
     let order=await razorpay.orders.create({amount,currency:'INR',receipt:'rec_'+Date.now()});
-    if(firestoreLive) await db.collection('payments').doc(order.id).set({userUid:req.user.uid, userPhone:req.user.phone, count, total:count*per, orderId:order.id, created:Date.now(), verified:false});
+    if(firestoreLive){
+      await db.collection('payments').doc(order.id).set({userUid:req.user.uid, userPhone:req.user.phone, count, total:count*per, orderId:order.id, created:Date.now(), verified:false});
+    }
     res.json({orderId:order.id, keyId:process.env.RAZORPAY_KEY_ID, count, total:count*per, locations, corePromise:CORE_PROMISE, firestoreLive});
-  }catch(e){ res.status(500).json({error:e.message}); }
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
 });
 
 app.post('/api/payment/verify', auth, async(req,res)=>{
@@ -279,16 +375,21 @@ app.post('/api/payment/verify', auth, async(req,res)=>{
     let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body;
     let body=razorpay_order_id+"|"+razorpay_payment_id;
     let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
-    // 100% hack proof timingSafeEqual
-    if(expected.length!== (razorpay_signature||'').length) return res.json({success:false, error:"Signature FAIL hack blocked"});
+    if(expected.length!== (razorpay_signature||'').length){
+      return res.json({success:false, error:"Signature FAIL hack blocked"});
+    }
     const isValid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature));
     if(isValid){
-      if(firestoreLive) await db.collection('payments').doc(razorpay_order_id).update({paymentId:razorpay_payment_id, verified:true, verifiedAt:Date.now()});
+      if(firestoreLive){
+        await db.collection('payments').doc(razorpay_order_id).update({paymentId:razorpay_payment_id, verified:true, verifiedAt:Date.now()});
+      }
       res.json({success:true,message:"100% Signature Verify by Abdul Samad App ON",corePromise:CORE_PROMISE});
     } else {
       res.json({success:false,error:"Signature FAIL hack blocked"});
     }
-  }catch(e){ res.json({success:false, error:e.message}); }
+  }catch(e){
+    res.json({success:false, error:e.message});
+  }
 });
 
 // CHAT - 100% PURE ENGLISH
@@ -316,7 +417,9 @@ ${CORE_PROMISE}`;
 });
 
 app.post('/api/video/upload-analyze', auth, upload.single('video'), async(req,res)=>{
-  if(!firestoreLive) return res.status(500).json({error:"Firestore not live"});
+  if(!firestoreLive){
+    return res.status(500).json({error:"Firestore not live"});
+  }
   const file = req.file;
   const sha256 = crypto.createHash('sha256').update(fs.readFileSync(file.path)).digest('hex');
   const capsule = {id:"cap_"+Date.now(), fileName:file.originalname, size:file.size, sha256, time:Date.now(), realClickProof:true, before:"02:15", incident:"02:18", after:"02:20"};
@@ -349,7 +452,6 @@ app.post('/api/emergency/action', auth, async(req,res)=>{
 
 app.post('/api/sms/send', auth, async(req,res)=>{
   let {message}=req.body;
-  // Privacy: do not log phone
   await db.collection('sms_logs').add({userUid:req.user.uid, message, time:Date.now()});
   res.json({success:true,message:"SMS sent SIM offline backup "+CORE_PROMISE});
 });
