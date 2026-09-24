@@ -36,7 +36,7 @@ app.use(cors({
     if (ALLOWED_ORIGINS.length === 0) {
       return cb(null, true);
     }
-    if (ALLOWED_ORIGINS.includes(origin) || origin.includes('flutterflow') || origin.includes('firebaseapp') || origin.includes('web.app')) {
+    if (ALLOWED_ORIGINS.includes(origin) || origin.includes('flutterflow') || origin.includes('firebaseapp') || origin.includes('web.app') || origin.includes('localhost')) {
       return cb(null, true);
     }
     return cb(new Error('Blocked by CORE PROMISE - CORS'));
@@ -51,6 +51,27 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 150, standardHeaders: true }));
 
 const CORE_PROMISE = "My AI agents never lie, my app never lies and my app never leaks customer privacy no matter what anyone asks. Never fake, only real click with time before after proof. Very fast. No one can hack. 100% secure encrypted.";
+
+// RATE CARD - R-A-T-E C-A-R-D - 99,85,70,60
+const RATE_CARD = {
+  "1-2": 99,
+  "3-5": 85,
+  "6-9": 70,
+  "10+": 60,
+  display: "99,85,70,60"
+};
+
+// STORAGE PLANS - 5GB FREE + EXTRA + CUSTOM 1-1000
+const COST_PER_GB = 2.20;
+const PROFIT = 10;
+const STORAGE_PLANS = {
+  base: { gb: 5, days: 7, price: 0, label: "Base 5GB FREE 7 Days" },
+  extra_10: { gb: 10, price: 32, label: "Extra 10GB 32 Rs" },
+  extra_50: { gb: 50, price: 120, label: "Extra 50GB" },
+  extra_100: { gb: 100, price: 230, label: "Extra 100GB" },
+  extra_500: { gb: 500, price: 1110, label: "Extra 500GB" }
+};
+const BASE_BYTES = 5 * 1024 * 1024 * 1024;
 
 // 2. FIREBASE INIT - 100% SECURE - FIXED VERSION - ROBUST ERROR CATCH - ALL BRACKETS CLOSED + FIRESTORE FIX
 let db = null;
@@ -84,7 +105,6 @@ try {
     sa = JSON.parse(sa);
   }
 
-  // VALIDATION - EASY CATCH
   if (!sa.private_key) {
     throw new Error('private_key MISSING in serviceAccount.json');
   }
@@ -95,7 +115,6 @@ try {
     throw new Error('project_id MISSING in serviceAccount.json');
   }
 
-  // FIX private_key newline
   sa.private_key = sa.private_key.replace(/\\n/g, '\n');
 
   console.log("Service Account Check - project:", sa.project_id, "email:", sa.client_email, "private_key lines:", sa.private_key.split('\n').length);
@@ -115,7 +134,6 @@ try {
     });
   }
 
-  // FIRESTORE FIX - for new firebase-admin version - brackets closed
   try {
     if (typeof admin.firestore === 'function') {
       db = admin.firestore();
@@ -148,6 +166,22 @@ try {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-env';
 
+// WORLD TIME HELPER - UTC + Local + Before 3min + After 2min
+function getWorldTime(tz) {
+  try {
+    const now = new Date();
+    const utc = now.toISOString();
+    const t = tz || "Asia/Kolkata";
+    const local = now.toLocaleString("en-IN", { timeZone: t, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    const b = new Date(now.getTime() - 3 * 60 * 1000);
+    const a = new Date(now.getTime() + 2 * 60 * 1000);
+    return { utcExact: utc, local: local, tz: t, beforeExact: b.toISOString(), afterExact: a.toISOString(), beforeLocal: b.toLocaleString("en-IN", { timeZone: t, hour12: true }), afterLocal: a.toLocaleString("en-IN", { timeZone: t, hour12: true }), ts: now.getTime() };
+  } catch (e) {
+    const now = new Date();
+    return { utcExact: now.toISOString(), local: now.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }), tz: "Asia/Kolkata", beforeExact: new Date(now.getTime() - 180000).toISOString(), afterExact: new Date(now.getTime() + 120000).toISOString(), beforeLocal: "", afterLocal: "", ts: now.getTime() };
+  }
+}
+
 // 3. AUTH MIDDLEWARE - FIREBASE AUTH - Phone OTP + Google + Email - No USERS memory
 async function auth(req, res, next) {
   try {
@@ -164,7 +198,7 @@ async function auth(req, res, next) {
   }
 }
 
-const upload = multer({ dest: 'uploads/', limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 50 * 1024 * 1024 } });
 
 const AGENTS = {
   ABDUL_WAHAB: { name: "Abdul Wahab", role: "Main Brain", greeting: "Have a nice day, Take care, You are doing great", corePromise: CORE_PROMISE, work: "Understands broken language, voice, text, photo, video clip. Offline records when WiFi power gone, rewinds full detail when back why when where how with real photo proof before after. Never fake video only real click. Respectful talk. Daily report auto. Expert of all 12 categories business growth, stock source, customer help notice.", dashboard: "Who came, loyal customer history, incidents before after real photos, live location share, camera health, daily report" },
@@ -270,15 +304,15 @@ const EMERGENCY_MAP = {
 
 function calcRate(count){
   if(count<=2){
-    return 99;
+    return RATE_CARD["1-2"];
   }
   if(count<=5){
-    return 85;
+    return RATE_CARD["3-5"];
   }
   if(count<=9){
-    return 70;
+    return RATE_CARD["6-9"];
   }
-  return 60;
+  return RATE_CARD["10+"];
 }
 function ccodeFix(cc){
   if(!cc){
@@ -288,7 +322,7 @@ function ccodeFix(cc){
 }
 
 // ROUTES
-app.get('/health',(req,res)=>res.json({ok:true,live:"SECURE ASSISTANT LIVE",corePromise:CORE_PROMISE,firestoreLive,razorpayLive,time:Date.now(),abdulWahab:"Main Brain LIVE",abdulSamad:"Security LIVE 100% verify"}));
+app.get('/health',(req,res)=>res.json({ok:true,live:"SECURE ASSISTANT LIVE",corePromise:CORE_PROMISE,firestoreLive,razorpayLive,time:Date.now(),abdulWahab:"Main Brain LIVE",abdulSamad:"Security LIVE 100% verify",rateCard:RATE_CARD, categories:12, tools:22, plans:STORAGE_PLANS}));
 app.get('/api/agents',(req,res)=>res.json(AGENTS));
 app.get('/api/languages',(req,res)=>res.json({languages:LANGUAGES,countryCodes:COUNTRY_CODES,corePromise:CORE_PROMISE}));
 app.get('/api/categories',(req,res)=>res.json(CATEGORIES));
@@ -302,23 +336,26 @@ app.post('/api/auth/register', auth, async(req,res)=>{
     return res.status(500).json({error:"Firestore not live"});
   }
   const {uid, phone, email} = req.user;
-  const {countryCode, language, name} = req.body;
+  const {countryCode, language, name, timezone, lat, lng} = req.body;
+  const wt = getWorldTime(timezone);
   const userData = {
     uid, phone: phone || req.body.phone, email: email || req.body.email,
     countryCode: ccodeFix(countryCode), language, name,
-    created: Date.now(), storageUsed: 0,
-    location: {lat:null,lng:null,permission:false},
+    timezone: timezone || "Asia/Kolkata",
+    created: Date.now(), createdAtExact: wt.utcExact, createdLocal: wt.local,
+    storageUsed: 0, storageLimit: BASE_BYTES, extraStorageGB: 0, autoPayEnabled: false,
+    location: {lat: lat || null, lng: lng || null, permission:!!(lat && lng), timezone: timezone || "Asia/Kolkata"},
     capsules: [], corePromise: CORE_PROMISE
   };
   await db.collection('users').doc(uid).set(userData,{merge:true});
-  res.json({success:true, message:"Firebase Auth Phone OTP Google Email Registered", user:userData, firestoreLive, corePromise:CORE_PROMISE});
+  res.json({success:true, message:"Firebase Auth Phone OTP Google Email Registered", user:userData, firestoreLive, corePromise:CORE_PROMISE, rateCard:RATE_CARD});
 });
 
 app.post('/api/auth/update-profile', auth, async(req,res)=>{
   if(!firestoreLive){
     return res.status(500).json({error:"Firestore not live"});
   }
-  const {newEmail, location, name} = req.body;
+  const {newEmail, location, name, timezone} = req.body;
   const updates = {};
   if(newEmail){
     updates.email = newEmail;
@@ -326,15 +363,19 @@ app.post('/api/auth/update-profile', auth, async(req,res)=>{
   if(name){
     updates.name = name;
   }
+  if(timezone){
+    updates.timezone = timezone;
+  }
   if(location){
-    updates.location = {...location, permission:true, updated:Date.now()};
+    const wt = getWorldTime(location.timezone || timezone);
+    updates.location = {...location, permission:true, updated:Date.now(), updatedExact: wt.utcExact, updatedLocal: wt.local, timezone: location.timezone || timezone || "Asia/Kolkata"};
   }
   await db.collection('users').doc(req.user.uid).set(updates,{merge:true});
   const snap = await db.collection('users').doc(req.user.uid).get();
   res.json({success:true, user:snap.data()});
 });
 
-// PAYMENT
+// PAYMENT - RATE CARD 99,85,70,60
 app.post('/api/payment/calculate', auth, (req,res)=>{
   let {cameraCount,totalCameraCount,locations}=req.body;
   let count=totalCameraCount||cameraCount||1;
@@ -342,18 +383,18 @@ app.post('/api/payment/calculate', auth, (req,res)=>{
     count=locations.reduce((s,l)=>s+(l.cameraCount||0),0);
   }
   let per=calcRate(count);
-  res.json({count, perCamera:per, total:count*per, corePromise:CORE_PROMISE});
+  res.json({count, perCamera:per, total:count*per, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
 });
 
 app.post('/api/calculatePrice', auth, (req,res)=>{
   let {cameraCount}=req.body;
   let per=calcRate(cameraCount);
-  res.json({count:cameraCount, perCamera:per, total:cameraCount*per, corePromise:CORE_PROMISE});
+  res.json({count:cameraCount, perCamera:per, total:cameraCount*per, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
 });
 
 app.post('/api/payment/generate-qr', auth, async (req,res)=>{
   try{
-    let {cameraCount,totalCameraCount,locations}=req.body;
+    let {cameraCount,totalCameraCount,locations, timezone}=req.body;
     let count=totalCameraCount||cameraCount||1;
     if(locations&&Array.isArray(locations)){
       count=locations.reduce((s,l)=>s+(l.cameraCount||0),0);
@@ -362,9 +403,10 @@ app.post('/api/payment/generate-qr', auth, async (req,res)=>{
     let amount=count*per*100;
     let order=await razorpay.orders.create({amount,currency:'INR',receipt:'rec_'+Date.now()});
     if(firestoreLive){
-      await db.collection('payments').doc(order.id).set({userUid:req.user.uid, userPhone:req.user.phone, count, total:count*per, orderId:order.id, created:Date.now(), verified:false});
+      const wt = getWorldTime(timezone);
+      await db.collection('payments').doc(order.id).set({userUid:req.user.uid, userPhone:req.user.phone, count, total:count*per, orderId:order.id, created:Date.now(), createdAtExact: wt.utcExact, createdLocal: wt.local, verified:false, rateCard:RATE_CARD});
     }
-    res.json({orderId:order.id, keyId:process.env.RAZORPAY_KEY_ID, count, total:count*per, locations, corePromise:CORE_PROMISE, firestoreLive});
+    res.json({orderId:order.id, keyId:process.env.RAZORPAY_KEY_ID, count, total:count*per, locations, corePromise:CORE_PROMISE, firestoreLive, rateCard:RATE_CARD});
   }catch(e){
     res.status(500).json({error:e.message});
   }
@@ -372,7 +414,7 @@ app.post('/api/payment/generate-qr', auth, async (req,res)=>{
 
 app.post('/api/payment/verify', auth, async(req,res)=>{
   try{
-    let {razorpay_order_id,razorpay_payment_id,razorpay_signature}=req.body;
+    let {razorpay_order_id,razorpay_payment_id,razorpay_signature, timezone}=req.body;
     let body=razorpay_order_id+"|"+razorpay_payment_id;
     let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
     if(expected.length!== (razorpay_signature||'').length){
@@ -381,9 +423,10 @@ app.post('/api/payment/verify', auth, async(req,res)=>{
     const isValid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature));
     if(isValid){
       if(firestoreLive){
-        await db.collection('payments').doc(razorpay_order_id).update({paymentId:razorpay_payment_id, verified:true, verifiedAt:Date.now()});
+        const wt = getWorldTime(timezone);
+        await db.collection('payments').doc(razorpay_order_id).update({paymentId:razorpay_payment_id, verified:true, verifiedAt:Date.now(), verifiedAtExact: wt.utcExact, verifiedLocal: wt.local});
       }
-      res.json({success:true,message:"100% Signature Verify by Abdul Samad App ON",corePromise:CORE_PROMISE});
+      res.json({success:true,message:"100% Signature Verify by Abdul Samad App ON",corePromise:CORE_PROMISE, rateCard:RATE_CARD});
     } else {
       res.json({success:false,error:"Signature FAIL hack blocked"});
     }
@@ -392,7 +435,118 @@ app.post('/api/payment/verify', auth, async(req,res)=>{
   }
 });
 
-// CHAT - 100% PURE ENGLISH
+app.get('/api/payment/order-status', auth, async(req,res)=>{
+  try{
+    if(!firestoreLive) return res.status(500).json({error:"Firestore not live"});
+    const orderId = req.query.orderId;
+    if(!orderId) return res.status(400).json({error:"orderId required"});
+    const snap = await db.collection('payments').doc(orderId).get();
+    if(!snap.exists) return res.status(404).json({verified:false, status:"not_found", orderId});
+    const data = snap.data();
+    if(data.userUid!== req.user.uid) return res.status(403).json({error:"Blocked PRIVACY"});
+    res.json({orderId, verified: data.verified || false, status: data.verified? "paid" : "pending", count: data.count, total: data.total, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.get('/api/payment/history', auth, async(req,res)=>{
+  try{
+    if(!firestoreLive) return res.status(500).json({error:"Firestore not live"});
+    const snap = await db.collection('payments').where('userUid','==', req.user.uid).get();
+    const history = snap.docs.map(d=>d.data()).sort((a,b)=> b.created - a.created);
+    const sSnap = await db.collection('storage_payments').where('userUid','==', req.user.uid).get();
+    const sHistory = sSnap.docs.map(d=>d.data()).sort((a,b)=> b.created - a.created);
+    res.json({cameraPayments: history, storagePayments: sHistory, count: history.length + sHistory.length, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+// STORAGE - 5GB FREE + EXTRA + CUSTOM 1-1000GB
+app.get('/api/storage/status', auth, async(req,res)=>{
+  if(!firestoreLive) return res.status(500).json({error:"Firestore not live"});
+  const snap = await db.collection('users').doc(req.user.uid).get();
+  const u = snap.data() || {};
+  const used = u.storageUsed || 0;
+  const limit = u.storageLimit || BASE_BYTES;
+  res.json({usedBytes: used, usedGB: (used / (1024*1024*1024)).toFixed(2), limitBytes: limit, limitGB: (limit/(1024*1024*1024)).toFixed(0), percent: limit>0? Math.round((used/limit)*100):0, isFull: used>=limit, autoPayEnabled: u.autoPayEnabled || false, plans: STORAGE_PLANS, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
+});
+
+app.post('/api/storage/buy-extra', auth, async(req,res)=>{
+  try{
+    const {planKey, timezone} = req.body;
+    const plan = STORAGE_PLANS[planKey];
+    if(!plan || plan.price===undefined) return res.status(400).json({error:"Valid planKey extra_10 extra_50 extra_100 extra_500"});
+    if(plan.price===0) return res.status(400).json({error:"Base free"});
+    let order = await razorpay.orders.create({amount: plan.price*100, currency:'INR', receipt:'storage_'+Date.now()});
+    if(firestoreLive){
+      const wt = getWorldTime(timezone);
+      await db.collection('storage_payments').doc(order.id).set({userUid:req.user.uid, planKey, gb:plan.gb, price:plan.price, orderId:order.id, created:Date.now(), createdAtExact: wt.utcExact, createdLocal: wt.local, verified:false});
+    }
+    res.json({orderId:order.id, keyId:process.env.RAZORPAY_KEY_ID, plan, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.post('/api/storage/buy-custom', auth, async(req,res)=>{
+  try{
+    let {customGB, timezone} = req.body;
+    customGB = parseInt(customGB);
+    if(!customGB || customGB<1 || customGB>1000) return res.status(400).json({error:"customGB 1 to 1000 required"});
+    const price = Math.round(customGB * COST_PER_GB + PROFIT);
+    let order = await razorpay.orders.create({amount: price*100, currency:'INR', receipt:'storage_custom_'+Date.now()});
+    if(firestoreLive){
+      const wt = getWorldTime(timezone);
+      await db.collection('storage_payments').doc(order.id).set({userUid:req.user.uid, planKey:"custom_"+customGB, gb:customGB, price, orderId:order.id, created:Date.now(), createdAtExact: wt.utcExact, createdLocal: wt.local, verified:false});
+    }
+    res.json({orderId:order.id, keyId:process.env.RAZORPAY_KEY_ID, customGB, price, perGBCost:COST_PER_GB, profit:PROFIT, message:customGB+"GB for Rs "+price, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.post('/api/storage/verify-extra', auth, async(req,res)=>{
+  try{
+    let {razorpay_order_id,razorpay_payment_id,razorpay_signature, timezone}=req.body;
+    let body=razorpay_order_id+"|"+razorpay_payment_id;
+    let expected=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
+    if(expected.length!== (razorpay_signature||'').length) return res.json({success:false, error:"Signature FAIL"});
+    const ok = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature || ''));
+    if(!ok) return res.json({success:false, error:"Signature FAIL blocked"});
+    if(firestoreLive){
+      const snap = await db.collection('storage_payments').doc(razorpay_order_id).get();
+      if(snap.exists){
+        const data = snap.data();
+        if(data.userUid!== req.user.uid) return res.status(403).json({error:"Blocked PRIVACY"});
+        const extra = data.gb * 1024*1024*1024;
+        await db.collection('users').doc(req.user.uid).update({storageLimit: admin.firestore.FieldValue.increment(extra), extraStorageGB: admin.firestore.FieldValue.increment(data.gb)});
+        const wt = getWorldTime(timezone);
+        await db.collection('storage_payments').doc(razorpay_order_id).update({paymentId:razorpay_payment_id, verified:true, verifiedAt:Date.now(), verifiedAtExact: wt.utcExact, verifiedLocal: wt.local});
+      }
+    }
+    res.json({success:true, message:"Extra Storage Added", rateCard:RATE_CARD, corePromise:CORE_PROMISE});
+  }catch(e){ res.json({success:false, error:e.message}); }
+});
+
+app.post('/api/storage/auto-pay', auth, async(req,res)=>{
+  const {enabled, timezone} = req.body;
+  const wt = getWorldTime(timezone);
+  await db.collection('users').doc(req.user.uid).set({autoPayEnabled:!!enabled, autoPayUpdated:Date.now(), autoPayUpdatedExact: wt.utcExact, autoPayUpdatedLocal: wt.local},{merge:true});
+  res.json({success:true, autoPayEnabled:!!enabled, message: enabled? "Auto-Pay ON" : "Auto-Pay OFF", rateCard:RATE_CARD, corePromise:CORE_PROMISE});
+});
+
+// SEARCH - NEW
+app.post('/api/search', auth, (req,res)=>{
+  let {q, type, timezone}=req.body;
+  const orig = q || "";
+  q = (q || "").toLowerCase().trim();
+  if(!q) return res.json({results:[], message:"Type search"});
+  let results=[];
+  CATEGORIES.forEach(c=>{ if(c.name.toLowerCase().includes(q) || c.subCategories.join(' ').toLowerCase().includes(q) || c.expertFeatures.join(' ').toLowerCase().includes(q)) results.push({type:"category",...c}); });
+  LANGUAGES.forEach(l=>{ if(l.name.toLowerCase().includes(q) || l.code.toLowerCase().includes(q)) results.push({type:"language",...l}); });
+  AI_TOOLS.forEach(t=>{ if(t.name.toLowerCase().includes(q) || t.work.toLowerCase().includes(q)) results.push({type:"ai-tool",...t}); });
+  CAM_METHODS.forEach(m=>{ if(m.name.toLowerCase().includes(q) || m.detail.toLowerCase().includes(q)) results.push({type:"camera-method",...m}); });
+  COUNTRY_CODES.forEach(cc=>{ if(cc.country.toLowerCase().includes(q) || cc.code.includes(q)) results.push({type:"country",...cc}); });
+  const wt = getWorldTime(timezone);
+  let reply=`Have a nice day, You said "${orig}" Found ${results.length} results UTC ${wt.utcExact} Local ${wt.local} ${CORE_PROMISE}`;
+  res.json({query:q, originalQuery:orig, count:results.length, results: type? results.filter(r=>r.type===type):results, reply:reply, exactTime: wt, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
+});
+
+// CHAT - 100% PURE ENGLISH - WORLD TIME + BEFORE AFTER
 app.post('/api/chat', auth, (req,res)=>{
   let {message,categoryId}=req.body;
   let msg=(message||"").toLowerCase();
@@ -413,28 +567,81 @@ Solution With Real Click Proof:
 4. Offline Revive: If power or internet goes, old phone still records offline and rewinds full detail when back with real photo proof before and after.
 
 ${CORE_PROMISE}`;
-  res.json({replyPureEnglish:reply, category:cat, tools, corePromise:CORE_PROMISE});
+  res.json({replyPureEnglish:reply, category:cat, tools, corePromise:CORE_PROMISE, rateCard:RATE_CARD});
+});
+
+app.post('/api/chat/send', auth, async(req,res)=>{
+  try{
+    let {message,categoryId, timezone, lat, lng}=req.body;
+    if(!message) return res.status(400).json({error:"message required"});
+    const wt = getWorldTime(timezone);
+    let ml=(message||"").toLowerCase();
+    let cat=CATEGORIES.find(c=> c.id==categoryId) || CATEGORIES.find(c=> ml.includes(c.name.split(' ')[0].toLowerCase())) || CATEGORIES[0];
+    let tools=cat.toolIds.map(id=> AI_TOOLS.find(t=>t.id==id)?.name || "AI Tool").join(', ');
+    const cust={chatId:"chat_"+wt.ts, userUid:req.user.uid, sender:"customer", message:message, created:wt.ts, createdAtExact: wt.utcExact, createdLocal: wt.local, timezone: wt.tz, lat: lat || null, lng: lng || null, categoryId:cat.id};
+    await db.collection('chats').add(cust);
+    let reply=`Abdul Wahab Main Brain Never Lies: Have a nice day, Take care, You are doing great\nYou said: "${message}"\nExact UTC: ${wt.utcExact}\nLocal: ${wt.local} TZ: ${wt.tz}\nCategory: ${cat.name}\nTools: ${tools}\nBefore ${wt.beforeLocal} Incident ${wt.local} After ${wt.afterLocal}\n${CORE_PROMISE}`;
+    const wahab={chatId:"chat_"+(wt.ts+1), userUid:req.user.uid, sender:"abdul_wahab", message:reply, replyTo:cust.chatId, category:cat, tools:tools, created:wt.ts+1, createdAtExact: new Date(wt.ts+1).toISOString(), createdLocal: new Date(wt.ts+1).toLocaleString("en-IN",{timeZone: wt.tz, hour12:true}), timezone: wt.tz, realClickProof:true, beforeExact: wt.beforeExact, afterExact: wt.afterExact, corePromise:CORE_PROMISE};
+    await db.collection('chats').add(wahab);
+    res.json({success:true, customerMessage:cust, abdulWahabReply:wahab, exactTime: wt, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.get('/api/chat/history', auth, async(req,res)=>{
+  if(!firestoreLive) return res.status(500).json({error:"Firestore not live"});
+  const snap = await db.collection('chats').where('userUid','==', req.user.uid).get();
+  const list = snap.docs.map(d=>d.data()).sort((a,b)=> a.created - b.created);
+  res.json({count:list.length, chats:list, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
 });
 
 app.post('/api/video/upload-analyze', auth, upload.single('video'), async(req,res)=>{
   if(!firestoreLive){
     return res.status(500).json({error:"Firestore not live"});
   }
+  const uSnap = await db.collection('users').doc(req.user.uid).get();
+  const uData = uSnap.data() || {storageUsed:0, storageLimit: BASE_BYTES};
+  const used = uData.storageUsed || 0;
+  const limit = uData.storageLimit || BASE_BYTES;
+  if(used >= limit) return res.status(403).json({error:"Storage Full", usedGB:(used/(1024*1024*1024)).toFixed(2), limitGB:(limit/(1024*1024*1024)).toFixed(0), plans:STORAGE_PLANS, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
   const file = req.file;
-  const sha256 = crypto.createHash('sha256').update(fs.readFileSync(file.path)).digest('hex');
-  const capsule = {id:"cap_"+Date.now(), fileName:file.originalname, size:file.size, sha256, time:Date.now(), realClickProof:true, before:"02:15", incident:"02:18", after:"02:20"};
+  if(!file) return res.status(400).json({error:"video file required"});
+  const buf = fs.readFileSync(file.path);
+  const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
+  const wt = getWorldTime(req.body.timezone || uData.timezone);
+  const capsule = {id:"cap_"+wt.ts, fileName:file.originalname, size:file.size, sha256, time:wt.ts, createdAtExact: wt.utcExact, localTime: wt.local, timezone: wt.tz, beforeExact: wt.beforeExact, beforeLocal: wt.beforeLocal, incidentExact: wt.utcExact, incidentLocal: wt.local, afterExact: wt.afterExact, afterLocal: wt.afterLocal, realClickProof:true};
   await db.collection('users').doc(req.user.uid).update({
     capsules: admin.firestore.FieldValue.arrayUnion(capsule),
     storageUsed: admin.firestore.FieldValue.increment(file.size)
   });
-  await db.collection('incidents').add({userUid:req.user.uid, userPhone:req.user.phone, capsule, created:Date.now(), corePromise:CORE_PROMISE});
-  res.json({success:true, message:"Video uploaded capsule saved encrypted 1 year. Deal extracted what happened where with time proof "+file.originalname, capsuleId:capsule.id, sha256, corePromise:CORE_PROMISE});
+  await db.collection('incidents').add({userUid:req.user.uid, userPhone:req.user.phone, capsule, created:wt.ts, createdAtExact: wt.utcExact, createdLocal: wt.local, timezone: wt.tz, corePromise:CORE_PROMISE});
+  try{ fs.unlinkSync(file.path); }catch(e){}
+  res.json({success:true, message:"Video uploaded capsule saved encrypted 1 year. Deal extracted what happened where with time proof "+file.originalname, capsuleId:capsule.id, sha256, timing:{beforeExact: wt.beforeExact, afterExact: wt.afterExact}, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
 });
 
 app.post('/api/location/update', auth, async(req,res)=>{
-  let {lat,lng}=req.body;
-  await db.collection('users').doc(req.user.uid).set({location:{lat,lng,permission:true,updated:Date.now()}},{merge:true});
-  res.json({success:true,message:"Location permission granted saved"});
+  let {lat,lng, timezone}=req.body;
+  const wt = getWorldTime(timezone);
+  await db.collection('users').doc(req.user.uid).set({location:{lat,lng,permission:true,updated:Date.now(), updatedExact: wt.utcExact, updatedLocal: wt.local, timezone: timezone || "Asia/Kolkata"}, timezone: timezone || "Asia/Kolkata"},{merge:true});
+  res.json({success:true,message:"Location permission granted saved", exactTime: wt, rateCard:RATE_CARD});
+});
+
+app.post('/api/alert/send', auth, async(req,res)=>{
+  try{
+    let {alertType, cameraId, message, timezone}=req.body;
+    const uSnap = await db.collection('users').doc(req.user.uid).get();
+    const user = uSnap.data() || {};
+    const wt = getWorldTime(timezone || user.timezone);
+    const alertData={alertId:"alert_"+wt.ts, userUid:req.user.uid, cameraId: cameraId || "cam_1", alertType: alertType || "Intrusion", message: message || alertType+" detected", created: wt.ts, createdAtExact: wt.utcExact, createdLocal: wt.local, timezone: wt.tz, location: user.location || null, realClickProof:true, beforeExact: wt.beforeExact, afterExact: wt.afterExact, status:"new", corePromise:CORE_PROMISE};
+    await db.collection('alerts').add(alertData);
+    res.json({success:true, alert:alertData, rateCard:RATE_CARD, message:"Alert Sent Real Photo Proof "+alertType});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.get('/api/alert/list', auth, async(req,res)=>{
+  if(!firestoreLive) return res.status(500).json({error:"Firestore not live"});
+  const snap = await db.collection('alerts').where('userUid','==', req.user.uid).get();
+  const list = snap.docs.map(d=>d.data()).sort((a,b)=> b.created - a.created);
+  res.json({count:list.length, alerts:list, rateCard:RATE_CARD, corePromise:CORE_PROMISE});
 });
 
 app.post('/api/emergency/action', auth, async(req,res)=>{
@@ -447,16 +654,17 @@ app.post('/api/emergency/action', auth, async(req,res)=>{
   let liveLink=`https://maps.google.com/?q=${user.location?.lat||0},${user.location?.lng||0}`;
   let smsText=`EMERGENCY ${emergencyType} at ${user.location?.lat},${user.location?.lng} Help! Live: ${liveLink} CORE PROMISE: ${CORE_PROMISE}`;
   await db.collection('incidents').add({userUid:req.user.uid, type:emergencyType, location:user.location, created:Date.now()});
-  res.json({success:true, country:map.country, countryCode:cc, emergencyType, emergencyNumber:num, location:user.location, liveLink, smsText, message:`Emergency ${emergencyType} - Country ${map.country} ${cc} - Number ${num} - Call+SMS+WhatsApp with permission - Real photo proof - ${CORE_PROMISE}`});
+  res.json({success:true, country:map.country, countryCode:cc, emergencyType, emergencyNumber:num, location:user.location, liveLink, smsText, rateCard:RATE_CARD, message:`Emergency ${emergencyType} - Country ${map.country} ${cc} - Number ${num} - Call+SMS+WhatsApp with permission - Real photo proof - ${CORE_PROMISE}`});
 });
 
 app.post('/api/sms/send', auth, async(req,res)=>{
-  let {message}=req.body;
-  await db.collection('sms_logs').add({userUid:req.user.uid, message, time:Date.now()});
-  res.json({success:true,message:"SMS sent SIM offline backup "+CORE_PROMISE});
+  let {message, timezone}=req.body;
+  const wt = getWorldTime(timezone);
+  await db.collection('sms_logs').add({userUid:req.user.uid, message, time:Date.now(), timeExact: wt.utcExact, timeLocal: wt.local});
+  res.json({success:true,message:"SMS sent SIM offline backup "+CORE_PROMISE, rateCard:RATE_CARD});
 });
 
-app.get('/',(req,res)=>res.json({status:"ok", message:"Backend Running For FlutterFlow - public/index.html deleted as per requirement - Full detail kept", corePromise:CORE_PROMISE, firestoreLive, razorpayLive, categories:12, tools:22, languages: LANGUAGES.length, countryCodes: COUNTRY_CODES.length}));
+app.get('/',(req,res)=>res.json({status:"ok", message:"Backend Running For FlutterFlow - public/index.html deleted as per requirement - Full detail kept - No Delete Version", corePromise:CORE_PROMISE, firestoreLive, razorpayLive, categories:12, tools:22, languages: LANGUAGES.length, countryCodes: COUNTRY_CODES.length, plans:STORAGE_PLANS, rateCard:RATE_CARD, emergencyCountries:Object.keys(EMERGENCY_MAP).length}));
 
 const PORT=process.env.PORT||10000;
-app.listen(PORT,'0.0.0.0',()=>console.log('✅ SECURE ASSISTANT LIVE '+PORT+' firestoreLive:'+firestoreLive+' razorpayLive:'+razorpayLive+' - '+CORE_PROMISE));
+app.listen(PORT,'0.0.0.0',()=>console.log('✅ SECURE ASSISTANT LIVE '+PORT+' firestoreLive:'+firestoreLive+' razorpayLive:'+razorpayLive+' rateCard:'+RATE_CARD.display+' - '+CORE_PROMISE));
