@@ -1,23 +1,25 @@
 {
   "name": "secure-assistant-backend",
-  "version": "1.0.0",
-  "description": "Secure Assistant - FINAL 100% REAL - 100% PURE ENGLISH - CORE PROMISE",
+  "version": "101.0.0",
+  "description": "Secure Assistant - 100% Real - Never fake only real click - Auto translate 150+ languages - CORE PROMISE secure - Python AI Ready",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
   "dependencies": {
+    "agora-access-token": "^2.0.4",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "express-rate-limit": "^7.2.0",
-    "firebase-admin": "^12.1.0",
-    "helmet": "^7.1.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "firebase-admin": "^11.11.0",
+    "form-data": "^4.0.6",
+    "helmet": "^7.0.0",
     "multer": "^1.4.5-lts.1",
     "node-fetch": "^3.3.2",
     "razorpay": "^2.9.2",
-    "twilio": "^4.23.0"
+    "twilio": "^4.19.3"
   },
   "engines": {
     "node": ">=18.0.0"
