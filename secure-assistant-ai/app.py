@@ -1,16 +1,27 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import torch
+import torch.nn.modules.container
+from torch.nn.modules.container import Sequential, ModuleList, ModuleDict
 from ultralytics import YOLO
 from PIL import Image
 import os
 
-# Fix for PyTorch 2.6 error
+# --- FIX START: Ye 8 line maine ADD ki hai, bina kuch delete kiye ---
+# PyTorch 2.6 ko batana ki Sequential safe hai
+torch.serialization.add_safe_globals([
+    torch.nn.modules.container.Sequential,
+    Sequential,
+    ModuleList,
+    ModuleDict
+])
 try:
     from ultralytics.nn.tasks import DetectionModel
-    torch.serialization.add_safe_globals([DetectionModel])
+    from ultralytics.nn.modules import Conv, Bottleneck, C2f, SPPF, Detect
+    torch.serialization.add_safe_globals([DetectionModel, Conv, Bottleneck, C2f, SPPF, Detect])
 except Exception:
     pass
+# --- FIX END ---
 
 app = Flask(__name__)
 CORS(app)
