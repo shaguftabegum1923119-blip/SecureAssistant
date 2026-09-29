@@ -8,19 +8,20 @@ from PIL import Image
 import os
 
 # --- FIX START: Ye 8 line maine ADD ki hai, bina kuch delete kiye ---
-# PyTorch 2.6 ko batana ki Sequential safe hai
-torch.serialization.add_safe_globals([
-    torch.nn.modules.container.Sequential,
-    Sequential,
-    ModuleList,
-    ModuleDict
-])
-try:
-    from ultralytics.nn.tasks import DetectionModel
-    from ultralytics.nn.modules import Conv, Bottleneck, C2f, SPPF, Detect
-    torch.serialization.add_safe_globals([DetectionModel, Conv, Bottleneck, C2f, SPPF, Detect])
-except Exception:
-    pass
+# PyTorch 2.6 ko batana ki Sequential safe hai - Purane version ke liye safe check
+if hasattr(torch.serialization, 'add_safe_globals'):
+    torch.serialization.add_safe_globals([
+        torch.nn.modules.container.Sequential,
+        Sequential,
+        ModuleList,
+        ModuleDict
+    ])
+    try:
+        from ultralytics.nn.tasks import DetectionModel
+        from ultralytics.nn.modules import Conv, Bottleneck, C2f, SPPF, Detect
+        torch.serialization.add_safe_globals([DetectionModel, Conv, Bottleneck, C2f, SPPF, Detect])
+    except Exception:
+        pass
 # --- FIX END ---
 
 app = Flask(__name__)
