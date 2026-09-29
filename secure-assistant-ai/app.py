@@ -50,6 +50,8 @@ def detect():
         results = model(img)
 
         detections = []
+        is_lion_found = False # --- YE MAINE ADD KIYA HAI LION KE LIYE ---
+
         for r in results:
             for box in r.boxes:
                 label = model.names[int(box.cls[0])]
@@ -59,11 +61,18 @@ def detect():
                         "label": label,
                         "confidence": round(confidence, 2)
                     })
+                    # --- YE MAINE ADD KIYA HAI - LION CHECK ---
+                    # Kyunki yolov8n me lion nahi hai, wo lion ko cat/dog/bear batata hai
+                    # To hum usko bhi lion samjhenge
+                    if label in ['cat', 'dog', 'bear', 'lion']:
+                        is_lion_found = True
 
         return jsonify({
             "is_real": True,
             "detections": detections,
-            "count": len(detections)
+            "count": len(detections),
+            "is_lion_present": is_lion_found, # --- YE MAINE ADD KIYA HAI ---
+            "lion_message": "Lion mil gaya!" if is_lion_found else "Lion nahi hai is image me" # --- YE MAINE ADD KIYA HAI ---
         })
 
     except Exception as e:
