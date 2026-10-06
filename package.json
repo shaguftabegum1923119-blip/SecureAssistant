@@ -1,8 +1,7 @@
 {
   "name": "secure-assistant-backend",
   "version": "14.0.0",
-  "description": "Secure Assistant backend 
-(Node.js, Firebase, Razorpay, Agora)",
+  "description": "Secure Assistant backend (Node.js, Firebase, Razorpay, Agora)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
