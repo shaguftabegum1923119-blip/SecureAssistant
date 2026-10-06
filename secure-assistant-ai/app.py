@@ -1,83 +1,140 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import torch
-import torch.nn.modules.container
-from torch.nn.modules.container import Sequential, ModuleList, ModuleDict
-from ultralytics import YOLO
-from PIL import Image
+# Secure Assistant AI service (Flask + 
+YOLOv8n)
+# Detects 80 common objects (person, car, 
+bag, etc.) in photos and videos.
+# It does NOT do face recognition, number 
+plates, fire or weapon detection yet.
+import hmac
 import os
-
-# --- FIX START: Ye 8 line maine ADD ki hai, bina kuch delete kiye ---
-# PyTorch 2.6 ko batana ki Sequential safe hai - Purane version ke liye safe check
-if hasattr(torch.serialization, 'add_safe_globals'):
-    torch.serialization.add_safe_globals([
-        torch.nn.modules.container.Sequential,
-        Sequential,
-        ModuleList,
-        ModuleDict
-    ])
-    try:
-        from ultralytics.nn.tasks import DetectionModel
-        from ultralytics.nn.modules import Conv, Bottleneck, C2f, SPPF, Detect
-        torch.serialization.add_safe_globals([DetectionModel, Conv, Bottleneck, C2f, SPPF, Detect])
-    except Exception:
-        pass
-# --- FIX END ---
-
+import tempfile
+import cv2
+from flask import Flask, jsonify, request
+from PIL import Image
+from ultralytics import YOLO
 app = Flask(__name__)
-CORS(app)
-
-# Load YOLO Model
-print("Loading YOLO Model...")
-model = YOLO('yolov8n.pt')
-print("Model Loaded Successfully!")
-
-@app.route('/')
-def home():
-    return jsonify({
-        "status": "SecureAssistant AI - 100% REAL - LIVE",
-        "is_real": True
-    })
-
-@app.route('/detect', methods=['POST'])
-def detect():
-    if 'image' not in request.files:
-        return jsonify({"error": "no image provided"}), 400
-
+def env_num(name, default, cast=float):
+    """Read a number from an environment 
+variable; fall back to the default if 
+missing or invalid."""
     try:
-        file = request.files['image']
-        img = Image.open(file.stream).convert("RGB")
-        results = model(img)
-
-        detections = []
-        is_lion_found = False # --- YE MAINE ADD KIYA HAI LION KE LIYE ---
-
-        for r in results:
-            for box in r.boxes:
-                label = model.names[int(box.cls[0])]
-                confidence = float(box.conf[0])
-                if confidence > 0.4:
-                    detections.append({
-                        "label": label,
-                        "confidence": round(confidence, 2)
-                    })
-                    # --- YE MAINE ADD KIYA HAI - LION CHECK ---
-                    # Kyunki yolov8n me lion nahi hai, wo lion ko cat/dog/bear batata hai
-                    # To hum usko bhi lion samjhenge
-                    if label in ['cat', 'dog', 'bear', 'lion']:
-                        is_lion_found = True
-
-        return jsonify({
-            "is_real": True,
-            "detections": detections,
-            "count": len(detections),
-            "is_lion_present": is_lion_found, # --- YE MAINE ADD KIYA HAI ---
-            "lion_message": "Lion mil gaya!" if is_lion_found else "Lion nahi hai is image me" # --- YE MAINE ADD KIYA HAI ---
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+        return cast(os.environ.get(name, 
+default))
+    except (TypeError, ValueError):
+        return default
+# Everything below can be tuned in Render's 
+environment without touching the code.
+app.config["MAX_CONTENT_LENGTH"] = 
+env_num("MAX_UPLOAD_MB", 25, int) * 1024 * 
+1024
+SECRET = os.environ.get("PYTHON_SECRET", 
+"")
+MIN_CONF = env_num("MIN_CONFIDENCE", 
+0.4)          # ignore detections below 
+this confidence (0 to 1)
+MAX_FRAMES = env_num("MAX_VIDEO_FRAMES", 8, 
+int)   # how many frames are sampled from a 
+video
+VIDEO_EXT = (".mp4", ".mov", ".avi", 
+".mkv", ".webm", ".3gp")
+model = YOLO(os.environ.get("YOLO_MODEL", 
+"yolov8n.pt"))  # downloads on first start 
+if the file is not present
+def authorized():
+    if not SECRET:  # refuse everything if 
+the secret is not configured
+        return False
+    return 
+hmac.compare_digest(request.headers.get("X
+CORE-SECRET", ""), SECRET)
+def detect_image(img):
+    found = []
+    for r in model(img, verbose=False):
+        for box in r.boxes:
+            conf = float(box.conf[0])
+            if conf >= MIN_CONF:
+                found.append({"label": 
+model.names[int(box.cls[0])], "confidence": 
+round(conf, 2)})
+    return found
+def detect_video(path):
+    cap = cv2.VideoCapture(path)
+    total = 
+int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    if total <= 0:
+        cap.release()
+        return None, 0
+    step = max(1, total // MAX_FRAMES)
+    best = {}
+    analyzed = 0
+    for idx in range(0, total, step):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 
+idx)
+        ok, frame = cap.read()
+        if not ok:
+            continue
+        analyzed += 1
+        img = 
+Image.fromarray(cv2.cvtColor(frame, 
+cv2.COLOR_BGR2RGB))
+        for d in detect_image(img):
+            cur = 
+best.setdefault(d["label"], {"label": 
+d["label"], "confidence": 0, "frames_seen": 
+0})
+            cur["confidence"] = 
+max(cur["confidence"], d["confidence"])
+            cur["frames_seen"] += 1
+    cap.release()
+    return list(best.values()), analyzed
+@app.route("/")
+def home():
+    return jsonify({"status": 
+"SecureAssistant AI live", "model": 
+"yolov8n (80 COCO objects)"})
+@app.route("/detect", methods=["POST"])
+def detect():
+    if not authorized():
+        return jsonify({"error": 
+"unauthorized"}), 401
+    f = request.files.get("file") or 
+request.files.get("image")
+    if f is None:
+        return jsonify({"error": "no 
+file"}), 400
+    name = (f.filename or "").lower()
+    meta = {"categoryId": 
+request.form.get("categoryId"), "uid": 
+request.form.get("uid")}
+    try:
+        if name.endswith(VIDEO_EXT) or 
+(f.mimetype or "").startswith("video/"):
+            suffix = os.path.splitext(name)
+[1] or ".mp4"
+            with 
+tempfile.NamedTemporaryFile(suffix=suffix, 
+delete=True) as tmp:
+                f.save(tmp.name)
+                detections, analyzed = 
+detect_video(tmp.name)
+            if detections is None:
+                return jsonify({"error": 
+"could not read video"}), 400
+            return jsonify({"type": 
+"video", "framesAnalyzed": analyzed, 
+"detections": detections, "count": 
+len(detections), **meta})
+        img = 
+Image.open(f.stream).convert("RGB")
+        detections = detect_image(img)
+        return jsonify({"type": "image", 
+"detections": detections, "count": 
+len(detections), **meta})
+    except Exception as e:  # unreadable or 
+unsupported file
+        app.logger.exception("detect 
+failed")
+        return jsonify({"error": "could not 
+process file"}), 400
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", 
+port=int(os.environ.get("PORT", 10000)))
