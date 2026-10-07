@@ -149,8 +149,14 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
-const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20 });
+// Behind Render's proxies Express can see the proxy's address instead of the customer's. Then every customer would share ONE
+// counter and everybody would get "429 Too Many Requests" together. So the limiter uses the real client address header when present.
+const clientIp = req => String(req.headers['true-client-ip'] || req.headers['cf-connecting-ip'] || req.ip || 'unknown');
+// General limit per client. Health check and cron routes are not counted here (cron routes are protected by the secret instead).
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, keyGenerator: clientIp, skip: req => req.path === '/health' || req.path.startsWith('/api/cron/') }));
+// Cron routes: successful calls are never limited, but repeated wrong-secret guesses are.
+app.use('/api/cron', rateLimit({ windowMs: 15 * 60 * 1000, max: 30, keyGenerator: clientIp, skipSuccessfulRequests: true }));
+const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, keyGenerator: clientIp });
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 // Per-user rate limiter (use after auth)
 const userLimiter = (max, windowMs = 60 * 60 * 1000) => rateLimit({ windowMs, max, standardHeaders: true, legacyHeaders: false, keyGenerator: req => req.user.uid, message: { error: 'Too many requests - try again later' } });
