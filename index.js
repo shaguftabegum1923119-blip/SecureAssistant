@@ -154,8 +154,6 @@ app.use(express.json({ limit: '10mb' }));
 const clientIp = req => String(req.headers['true-client-ip'] || req.headers['cf-connecting-ip'] || req.ip || 'unknown');
 // General limit per client. Health check and cron routes are not counted here (cron routes are protected by the secret instead).
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, keyGenerator: clientIp, skip: req => req.path === '/health' || req.path.startsWith('/api/cron/') }));
-// Cron routes: successful calls are never limited, but repeated wrong-secret guesses are.
-app.use('/api/cron', rateLimit({ windowMs: 15 * 60 * 1000, max: 30, keyGenerator: clientIp, skipSuccessfulRequests: true }));
 const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20, keyGenerator: clientIp });
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 // Per-user rate limiter (use after auth)
@@ -1037,8 +1035,7 @@ app.post('/api/emergency/action', auth, wrap(async (req, res) => {
 // ---------- CRON: storage cleanup ----------
 // Only touches AI capsules (incidents) of users who are over their limit: oldest first, older than 8 days,
 // stops as soon as the user is back under the limit. Vault files, faces, billing data and offline clips are never deleted here.
-app.post('/api/cron/storage-cleanup', wrap(async (req, res) => {
-  if (!req.headers['x-cron-secret'] || !safeCompare(req.headers['x-cron-secret'], CRON_SECRET)) throw httpError(401, 'Unauthorized');
+app.post('/api/cron/storage-cleanup', requireCron, wrap(async (req, res) => {
   let cleaned = 0, freedBytes = 0;
   const users = await db.collection('users').get();
   for (const ud of users.docs) {
@@ -1068,10 +1065,16 @@ const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const TRIAL_ENABLED = process.env.TRIAL_ENABLED === 'true'; // default OFF: paid plans only
 const TRIAL_DAYS = 7;
 const SUB_TOTAL_COUNT = { monthly: 60, yearly: 10 }; // billing cycles Razorpay will keep charging
+const cronFails = new Map(); // client address -> { count, resetAt } (wrong-secret attempts only)
 function requireCron(req, res, next) { // function declaration = hoisted, so routes above can use it
   const h = req.headers['x-cron-secret'];
-  if (!h || !safeCompare(h, CRON_SECRET)) return next(httpError(401, 'Unauthorized'));
-  next();
+  if (h && safeCompare(h, CRON_SECRET)) return next(); // correct secret: always allowed, never rate-limited
+  const key = clientIp(req), now = Date.now();
+  let f = cronFails.get(key);
+  if (!f || f.resetAt < now) { f = { count: 0, resetAt: now + 15 * 60 * 1000 }; cronFails.set(key, f); }
+  f.count++;
+  if (cronFails.size > 5000) for (const [k, v] of cronFails) if (v.resetAt < now) cronFails.delete(k);
+  return next(f.count > 30 ? httpError(429, 'Too many wrong attempts') : httpError(401, 'Unauthorized'));
 }
 // Never send encrypted bank number, push tokens or subscription id to the app
 function publicUser(u) {
