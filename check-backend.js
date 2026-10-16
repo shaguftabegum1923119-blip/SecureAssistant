@@ -5,12 +5,6 @@
 //   ID_TOKEN     a Firebase login token of a real test user                      (optional, enables login-protected checks)
 //   CRON_SECRET  same value as on Render                                         (optional, checks the cron routes)
 //   TEST_IMAGE   path to a real photo with people in it, e.g. ./people.jpg       (optional, checks the AI counting)
-//
-// Windows PowerShell example:
-//   $env:BASE_URL="https://your-backend.onrender.com"; $env:ID_TOKEN="..."; node check-backend.js
-//
-// Getting ID_TOKEN: sign in with a test user in your FlutterFlow app (or the Firebase console REST sign-in)
-// and copy the ID token. It expires after about one hour.
 
 const fs = require('fs');
 const path = require('path');
@@ -50,12 +44,10 @@ async function call(method, route, { body, form, headers = {}, auth = false, tim
 (async () => {
   console.log(`Checking ${BASE}\n(The first call can take up to a minute if the server was asleep.)\n`);
 
-  // 1. Server alive and data loaded
   let r = await call('GET', '/health', { timeoutMs: 120000 });
   record('Server is up (/health)', r.status === 200 && r.data && r.data.ok === true,
     r.data ? `categories=${r.data.categories} languages=${r.data.languages} countries=${r.data.countries}` : 'no response');
 
-  // 2. Public world data
   r = await call('GET', '/api/languages');
   record('Languages list', r.status === 200 && Array.isArray(r.data && r.data.languages) && r.data.languages.length > 50, r.data && r.data.languages ? `${r.data.languages.length} languages` : '');
   r = await call('GET', '/api/countries');
@@ -67,7 +59,6 @@ async function call(method, route, { body, form, headers = {}, auth = false, tim
   record('AI tools list with honest status', r.status === 200 && Array.isArray(tools) && tools.every(t => ['live', 'beta', 'coming_soon'].includes(t.status)),
     Array.isArray(tools) ? `${tools.length} tools: ${['live', 'beta', 'coming_soon'].map(s => s + '=' + tools.filter(t => t.status === s).length).join(', ')}` : '');
 
-  // 3. Security basics: protected routes must refuse without login
   r = await call('GET', '/api/cameras/list');
   record('Protected route refuses without login', r.status === 401, `status ${r.status}`);
   r = await call('POST', '/api/payment/webhook', { body: { x: 1 }, headers: { 'x-razorpay-signature': 'wrong' } });
@@ -75,44 +66,42 @@ async function call(method, route, { body, form, headers = {}, auth = false, tim
   r = await call('POST', '/api/cron/camera-health', { headers: { 'x-cron-secret': 'wrong-secret' } });
   record('Cron route rejects a wrong secret', r.status === 401, `status ${r.status}`);
 
-  // 4. Cron routes with the real secret
+  // Bank routes must be gone in V15
+  r = await call('POST', '/api/bank/add', { auth: false, body: {} });
+  record('Bank routes are removed', r.status === 404, `status ${r.status}`);
+
   if (CRON) {
-    for (const route of ['/api/cron/camera-health', '/api/cron/process-deletions', '/api/cron/daily-report', '/api/cron/storage-cleanup']) {
+    for (const route of ['/api/cron/camera-health', '/api/cron/process-deletions', '/api/cron/daily-report', '/api/cron/storage-cleanup', '/api/cron/owner-digest']) {
       r = await call('POST', route, { headers: { 'x-cron-secret': CRON }, timeoutMs: 120000 });
       record(`Cron ${route}`, r.status === 200, r.status === 200 ? JSON.stringify(r.data).slice(0, 80) : `status ${r.status} ${(r.data && r.data.error) || ''}`);
     }
   } else skip('Cron routes with real secret', 'set CRON_SECRET to test');
 
-  // 5. Login-protected checks
   if (!TOKEN) {
     skip('All login-protected checks', 'set ID_TOKEN to test');
   } else {
     r = await call('GET', '/api/user/full-box', { auth: true });
     record('Login works and profile loads (/api/user/full-box)', r.status === 200, `status ${r.status} ${(r.data && r.data.error) || ''}`);
 
-    r = await call('POST', '/api/payment/calculate', { auth: true, body: { cameraCount: 6, billingType: 'monthly' } });
-    record('Price calculation', r.status === 200 && r.data && r.data.payable > 0, r.data ? `6 cameras monthly = Rs ${r.data.payable}` : '');
-    const rY = await call('POST', '/api/payment/calculate', { auth: true, body: { cameraCount: 6, billingType: 'yearly' } });
-    record('Yearly price = 11 months of monthly', rY.status === 200 && r.data && rY.data && rY.data.payable === r.data.payable * 11, rY.data ? `yearly = Rs ${rY.data.payable}` : '');
-
-    let prev = 0, rising = true;
-    for (let n = 1; n <= 15; n++) {
-      const p = await call('POST', '/api/payment/calculate', { auth: true, body: { cameraCount: n, billingType: 'monthly' } });
-      if (!p.data || p.data.payable < prev) rising = false;
-      prev = p.data ? p.data.payable : prev;
-    }
-    record('Price never drops when cameras are added (1 to 15)', rising);
+    // Price must equal camera count x the rate for its slab (no more "never drops" logic)
+    const p1 = await call('POST', '/api/payment/calculate', { auth: true, body: { cameraCount: 1, billingType: 'monthly' } });
+    record('1 camera = Rs 99', p1.data && p1.data.payable === 99, p1.data ? `got Rs ${p1.data.payable}` : '');
+    const p6 = await call('POST', '/api/payment/calculate', { auth: true, body: { cameraCount: 6, billingType: 'monthly' } });
+    record('6 cameras = Rs 420 (6 x Rs 70)', p6.data && p6.data.payable === 420, p6.data ? `got Rs ${p6.data.payable}` : '');
+    const p10 = await call('POST', '/api/payment/calculate', { auth: true, body: { cameraCount: 10, billingType: 'monthly' } });
+    record('10 cameras = Rs 600 (10 x Rs 60)', p10.data && p10.data.payable === 600, p10.data ? `got Rs ${p10.data.payable}` : '');
+    const pY = await call('POST', '/api/payment/calculate', { auth: true, body: { cameraCount: 6, billingType: 'yearly' } });
+    record('Yearly price = 11 months of monthly', pY.data && p6.data && pY.data.payable === p6.data.payable * 11, pY.data ? `yearly = Rs ${pY.data.payable}` : '');
 
     r = await call('GET', '/api/cameras/list', { auth: true });
     record('Camera list', r.status === 200, `status ${r.status} ${(r.data && r.data.error) || ''}`);
     r = await call('GET', '/api/settings/alerts', { auth: true });
     record('Alert settings', r.status === 200 && r.data && r.data.settings, `status ${r.status}`);
     r = await call('GET', '/api/storage/status', { auth: true });
-    record('Storage status', r.status === 200, `status ${r.status}`);
+    record('Storage status: 5 GB free', r.status === 200 && r.data && r.data.limit === 5 * 1024 * 1024 * 1024, r.data ? `limit=${r.data.limit}` : `status ${r.status}`);
     r = await call('GET', '/api/alert/list', { auth: true });
     record('Alert list', r.status === 200, `status ${r.status} ${(r.data && r.data.error) || ''}`);
 
-    // 6. Real AI counting on a real photo
     if (IMAGE && fs.existsSync(IMAGE)) {
       const form = new FormData();
       form.append('frame', new Blob([fs.readFileSync(IMAGE)]), path.basename(IMAGE));

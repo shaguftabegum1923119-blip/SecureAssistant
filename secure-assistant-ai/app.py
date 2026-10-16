@@ -4,6 +4,7 @@
 import hmac
 import os
 import tempfile
+import threading
 
 import cv2
 from flask import Flask, jsonify, request
@@ -12,6 +13,7 @@ from ultralytics import YOLO
 
 app = Flask(__name__)
 
+
 def env_num(name, default, cast=float):
     """Read a number from an environment variable; fall back to the default if missing or invalid."""
     try:
@@ -19,24 +21,61 @@ def env_num(name, default, cast=float):
     except (TypeError, ValueError):
         return default
 
-# Everything below can be tuned in Render's environment without touching the code.
+
 app.config["MAX_CONTENT_LENGTH"] = env_num("MAX_UPLOAD_MB", 25, int) * 1024 * 1024
 SECRET = os.environ.get("PYTHON_SECRET", "")
-MIN_CONF = env_num("MIN_CONFIDENCE", 0.4)          # ignore detections below this confidence (0 to 1)
-MAX_FRAMES = env_num("MAX_VIDEO_FRAMES", 8, int)   # how many frames are sampled from a video
+MIN_CONF = env_num("MIN_CONFIDENCE", 0.4)
+MAX_FRAMES = env_num("MAX_VIDEO_FRAMES", 8, int)
 VIDEO_EXT = (".mp4", ".mov", ".avi", ".mkv", ".webm", ".3gp")
 
-model = YOLO(os.environ.get("YOLO_MODEL", "yolov8n.pt"))  # downloads on first start if the file is not present
+_model = None
+_model_error = None
+_model_lock = threading.Lock()
+
+
+def model_path():
+    custom = os.environ.get("YOLO_MODEL")
+    if custom:
+        return custom
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yolov8n.pt")
+    return here if os.path.exists(here) else "yolov8n.pt"
+
+
+def get_model():
+    global _model, _model_error
+    if _model is not None:
+        return _model
+    with _model_lock:
+        if _model is None:
+            try:
+                _model = YOLO(model_path())
+                _model_error = None
+            except Exception as e:
+                _model_error = str(e)[:200]
+                app.logger.exception("model load failed")
+                raise
+    return _model
+
+
+def _warm_up():
+    try:
+        get_model()
+    except Exception:
+        pass
+
+
+threading.Thread(target=_warm_up, daemon=True).start()
 
 
 def authorized():
-    if not SECRET:  # refuse everything if the secret is not configured
+    if not SECRET:
         return False
     return hmac.compare_digest(request.headers.get("X-CORE-SECRET", ""), SECRET)
 
 
 def detect_image(img):
     found = []
+    model = get_model()
     for r in model(img, verbose=False):
         for box in r.boxes:
             conf = float(box.conf[0])
@@ -70,8 +109,10 @@ def detect_video(path):
 
 
 @app.route("/")
+@app.route("/health")
 def home():
-    return jsonify({"status": "SecureAssistant AI live", "model": "yolov8n (80 COCO objects)"})
+    return jsonify({"status": "SecureAssistant AI live", "model": "yolov8n (80 COCO objects)",
+                    "modelLoaded": _model is not None, "modelError": _model_error})
 
 
 @app.route("/detect", methods=["POST"])
@@ -81,6 +122,10 @@ def detect():
     f = request.files.get("file") or request.files.get("image")
     if f is None:
         return jsonify({"error": "no file"}), 400
+    try:
+        get_model()
+    except Exception:
+        return jsonify({"error": "model not ready, try again in a minute"}), 503
     name = (f.filename or "").lower()
     meta = {"categoryId": request.form.get("categoryId"), "uid": request.form.get("uid")}
     try:
@@ -91,11 +136,12 @@ def detect():
                 detections, analyzed = detect_video(tmp.name)
             if detections is None:
                 return jsonify({"error": "could not read video"}), 400
-            return jsonify({"type": "video", "framesAnalyzed": analyzed, "detections": detections, "count": len(detections), **meta})
+            return jsonify({"type": "video", "framesAnalyzed": analyzed,
+                            "detections": detections, "count": len(detections), **meta})
         img = Image.open(f.stream).convert("RGB")
         detections = detect_image(img)
         return jsonify({"type": "image", "detections": detections, "count": len(detections), **meta})
-    except Exception as e:  # unreadable or unsupported file
+    except Exception as e:
         app.logger.exception("detect failed")
         return jsonify({"error": "could not process file"}), 400
 
