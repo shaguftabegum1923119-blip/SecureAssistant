@@ -24,8 +24,9 @@ def env_num(name, default, cast=float):
 
 app.config["MAX_CONTENT_LENGTH"] = env_num("MAX_UPLOAD_MB", 25, int) * 1024 * 1024
 SECRET = os.environ.get("PYTHON_SECRET", "")
-MIN_CONF = env_num("MIN_CONFIDENCE", 0.4)
+MIN_CONF = env_num("MIN_CONFIDENCE", 0.3)
 MAX_FRAMES = env_num("MAX_VIDEO_FRAMES", 8, int)
+IMG_SIZE = env_num("YOLO_IMG_SIZE", 320, int)
 VIDEO_EXT = (".mp4", ".mov", ".avi", ".mkv", ".webm", ".3gp")
 
 _model = None
@@ -76,7 +77,7 @@ def authorized():
 def detect_image(img):
     found = []
     model = get_model()
-    for r in model(img, verbose=False):
+    for r in model(img, verbose=False, imgsz=IMG_SIZE):
         for box in r.boxes:
             conf = float(box.conf[0])
             if conf >= MIN_CONF:
@@ -111,7 +112,7 @@ def detect_video(path):
 @app.route("/")
 @app.route("/health")
 def home():
-    return jsonify({"status": "SecureAssistant AI live", "model": "yolov8n (80 COCO objects)",
+    return jsonify({"status": "SecureAssistant AI live", "model": "yolov8n (80 COCO objects, lightweight mode)",
                     "modelLoaded": _model is not None, "modelError": _model_error})
 
 

@@ -200,8 +200,8 @@ async function assertStorage(uid, size) {
 }
 
 // ---------- PUBLIC DATA ----------
-app.get('/', (req, res) => res.json({ ok: true, app: 'Secure Assistant', version: 'V14' }));
-app.get('/health', (req, res) => res.json({ ok: true, version: 'V14', categories: CATEGORIES.length, languages: LANGUAGES.length, countries: COUNTRY_CODES.length, agoraReady: !!RtcTokenBuilder, wahabReady: !!process.env.ANTHROPIC_API_KEY }));
+app.get('/', (req, res) => res.json({ ok: true, app: 'Secure Assistant', version: 'V15' }));
+app.get('/health', (req, res) => res.json({ ok: true, version: 'V15', categories: CATEGORIES.length, languages: LANGUAGES.length, countries: COUNTRY_CODES.length, agoraReady: !!RtcTokenBuilder, wahabReady: !!process.env.ANTHROPIC_API_KEY }));
 app.get('/api/languages', (req, res) => res.json({ languages: LANGUAGES, countryCodes: COUNTRY_CODES, search: ['voice', 'text', 'manual'] }));
 app.get('/api/countries', (req, res) => res.json({ count: COUNTRY_CODES.length, countries: COUNTRY_CODES }));
 app.get('/api/categories', (req, res) => res.json(CATEGORIES));
@@ -1385,7 +1385,7 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 });
 process.on('unhandledRejection', e => console.error('unhandledRejection', e));
 
-app.listen(PORT, '0.0.0.0', () => console.log('Secure Assistant V14 live on port ' + PORT));
+app.listen(PORT, '0.0.0.0', () => console.log('Secure Assistant V15 live on port ' + PORT));
 
 /*
 FIRESTORE COMPOSITE INDEXES (create when Render logs print "index missing" - the log has a direct link):
