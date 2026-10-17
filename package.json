@@ -1,10 +1,11 @@
 {
   "name": "secure-assistant-backend",
-  "version": "14.0.0",
+  "version": "15.0.0",
   "description": "Secure Assistant backend (Node.js, Firebase, Razorpay, Agora)",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "check": "node --check index.js && node --check core.js && node --check routes-account.js && node --check routes-cameras.js && node --check routes-money.js && node --check routes-wahab.js && node --check cron.js && node --check staticData.js"
   },
   "engines": {
     "node": ">=18"
