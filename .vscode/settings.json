@@ -1,0 +1,10 @@
+{
+    "python.terminal.useEnvFile": true,
+    "python-envs.pythonProjects": [
+        {
+            "path": "secure-assistant-ai/app.py",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ]
+}
