@@ -1,6 +1,7 @@
 'use strict';
 // SECURE ASSISTANT BACKEND - V15 (main file).
-// Files: index.js, core.js, b2Storage.js, routes-account.js, routes-cameras.js, routes-money.js, routes-wahab.js, routes-help.js, routes-agent.js, routes-dvr.js, routes-owner.js, cron.js, staticData.js
+// Files: index.js, core.js, b2Storage.js, routes-account.js, routes-cameras.js, routes-money.js, routes-wahab.js, routes-help.js, routes-agent.js, routes-dvr.js, routes-owner.js, cron.js, staticData, plus the folder legal/ with the 4 legal pages.js
+const path = require('path');
 const core = require('./core');
 const { PORT, clientIp, cors, express, helmet, multer, notifyOwner, rateLimit } = core;
 
@@ -10,7 +11,7 @@ app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use('/api/payment/webhook', express.raw({ type: 'application/json' })); // MUST be before express.json
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({
+const corsRules = cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true); // mobile apps send no Origin
     try {
@@ -23,7 +24,13 @@ app.use(cors({
     return cb(new Error('CORS blocked'));
   },
   credentials: true
-}));
+});
+// The pages this backend serves itself (/owner and /paytest) call the API from the same address, so they skip the CORS check.
+app.use((req, res, next) => {
+  const o = req.headers.origin;
+  if (o && req.headers.host && (o === 'https://' + req.headers.host || o === 'http://' + req.headers.host)) return next();
+  return corsRules(req, res, next);
+});
 app.use(express.json({ limit: '10mb' }));
 
 // General limit per client. Health check and cron routes are not counted here (cron is protected by its secret).
@@ -33,6 +40,10 @@ app.use(rateLimit({
   keyGenerator: clientIp,
   skip: req => req.path === '/health' || req.path.startsWith('/api/cron/')
 }));
+
+// Legal pages (privacy, terms, refund, delete-account): put the 4 .html files in a folder called "legal" next to this file.
+// They open at /privacy, /terms, /refund and /delete-account.
+app.use(express.static(path.join(__dirname, 'legal'), { extensions: ['html'], maxAge: '1h' }));
 
 // Route files, loaded in this order
 for (const file of ['./routes-account', './routes-cameras', './routes-money', './routes-wahab', './routes-help', './routes-agent', './routes-dvr', './routes-owner', './cron']) {
