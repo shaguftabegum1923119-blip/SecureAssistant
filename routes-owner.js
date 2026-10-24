@@ -82,4 +82,427 @@ module.exports = function register(app, core) {
     await tellCustomer(a.uid, `Your ${what} request was ${decision}.${note ? ' ' + note : ''}`);
     res.json({ success: true, status: decision, type: a.type, reminder: 'Nothing was changed automatically. Do the real action yourself.' });
   }));
+
+  // ---------- OWNER PAGE ----------
+  // Open https://secureassistant.onrender.com/owner in a browser and log in with your owner email and password.
+  // The page itself holds no data. Every list and action goes through the owner-only routes above.
+  const OWNER_PAGE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Secure Assistant - Owner</title>
+<style>
+:root{--bg:#f4f5f7;--card:#ffffff;--text:#1b1f24;--muted:#5d6670;--line:#dde1e6;--accent:#1f6feb;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700;--chip:#eef1f4}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1317;--card:#171c22;--text:#e8ecf0;--muted:#9aa5b1;--line:#2a323b;--accent:#58a6ff;--ok:#3fb950;--bad:#f85149;--warn:#d29922;--chip:#222a33}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:6px 0 2px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 12px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,textarea,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font:inherit}
+textarea{min-height:76px;resize:vertical}
+button{font:inherit;border:0;border-radius:10px;padding:11px 14px;background:var(--accent);color:#fff;cursor:pointer}
+button.ghost{background:var(--chip);color:var(--text)}
+button.ok{background:var(--ok)}
+button.bad{background:var(--bad)}
+button:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 auto}
+.row>button{flex:0 0 auto}
+.tabs{display:flex;gap:8px;margin:0 0 10px}
+.tabs button{flex:1;background:var(--chip);color:var(--text)}
+.tabs button.on{background:var(--accent);color:#fff}
+.msg{min-height:20px;font-size:14px;margin:8px 0;color:var(--muted)}
+.msg.bad{color:var(--bad)}
+.msg.ok{color:var(--ok)}
+.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--chip);color:var(--muted);margin-left:6px}
+.title{font-weight:600}
+.body{white-space:pre-wrap;word-wrap:break-word;margin:8px 0}
+.meta{font-size:13px;color:var(--muted);margin:6px 0}
+.reply{border-left:3px solid var(--ok);padding-left:10px;margin:8px 0;white-space:pre-wrap}
+.note{font-size:13px;color:var(--warn);margin:6px 0}
+.empty{text-align:center;color:var(--muted);padding:22px 0}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Secure Assistant - Owner</h1>
+  <p class="sub">Sirf owner ke liye. Customer ka naam, email ya phone yahan nahi dikhta.</p>
+
+  <div id="loginBox" class="card">
+    <label for="email">Owner email</label>
+    <input id="email" type="email" autocomplete="username" inputmode="email">
+    <label for="pass">Password</label>
+    <input id="pass" type="password" autocomplete="current-password">
+    <div class="msg" id="loginMsg"></div>
+    <button id="loginBtn">Login</button>
+  </div>
+
+  <div id="app" class="hide">
+    <div class="tabs">
+      <button id="tabTickets" class="on">Tickets</button>
+      <button id="tabReq">Requests</button>
+    </div>
+    <div class="row">
+      <select id="status"></select>
+      <button class="ghost" id="refreshBtn">Refresh</button>
+      <button class="ghost" id="logoutBtn">Logout</button>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+var API_KEY = __KEY__;
+var idToken = '';
+var refreshToken = '';
+var tab = 'tickets';
+
+function $(id) { return document.getElementById(id); }
+function el(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined && text !== null) e.textContent = text;
+  return e;
+}
+function say(id, text, kind) { var m = $(id); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+function fmt(ms) { return ms ? new Date(ms).toLocaleString('en-IN') : ''; }
+function nice(s) { return String(s || '').split('_').join(' '); }
+
+async function signIn(email, password) {
+  if (!API_KEY) throw new Error('Render ke Environment mein FIREBASE_API_KEY set nahi hai.');
+  var r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + encodeURIComponent(API_KEY), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: password, returnSecureToken: true })
+  });
+  var d = await r.json();
+  if (!r.ok) throw new Error((d.error && d.error.message) || 'Login failed');
+  idToken = d.idToken; refreshToken = d.refreshToken;
+}
+
+async function refresh() {
+  var r = await fetch('https://securetoken.googleapis.com/v1/token?key=' + encodeURIComponent(API_KEY), {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(refreshToken)
+  });
+  var d = await r.json();
+  if (!r.ok) throw new Error('Session khatam ho gaya, dobara login kijiye.');
+  idToken = d.id_token; refreshToken = d.refresh_token;
+}
+
+async function api(method, path, body, retried) {
+  var opt = { method: method, headers: { 'Authorization': 'Bearer ' + idToken } };
+  if (body) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  var r = await fetch(path, opt);
+  if (r.status === 401 && !retried && refreshToken) { await refresh(); return api(method, path, body, true); }
+  var d = {};
+  try { d = await r.json(); } catch (e) { d = {}; }
+  if (!r.ok) {
+    var err = new Error(r.status === 404 ? 'Ye account owner nahi hai. Render mein OWNER_UID check kijiye.' : (d.error || d.message || ('Error ' + r.status)));
+    err.status = r.status; throw err;
+  }
+  return d;
+}
+
+function customerLine(c) {
+  var box = el('div', 'meta');
+  if (!c) { box.textContent = 'Customer: nahi mila (account delete ho gaya ho sakta hai)'; return box; }
+  var plan = c.planActive ? 'Plan chalu' + (c.planExpiry ? ' (' + fmt(c.planExpiry) + ' tak)' : '') : 'Plan chalu nahi';
+  box.appendChild(el('span', null, 'Customer ID: ' + c.id + '  |  ' + plan + '  '));
+  var b = el('button', 'ghost', 'Copy ID');
+  b.style.padding = '3px 9px'; b.style.fontSize = '12px';
+  b.onclick = function () {
+    if (navigator.clipboard) navigator.clipboard.writeText(c.id).then(function () { b.textContent = 'Copied'; });
+  };
+  box.appendChild(b);
+  return box;
+}
+
+function setStatusOptions() {
+  var s = $('status'); s.innerHTML = '';
+  var opts = tab === 'tickets' ? [['open', 'Open tickets'], ['closed', 'Closed tickets']] : [['pending', 'Pending (jawab baaki)'], ['approved', 'Approved'], ['rejected', 'Rejected']];
+  for (var i = 0; i < opts.length; i++) { var o = el('option', null, opts[i][1]); o.value = opts[i][0]; s.appendChild(o); }
+}
+
+function ticketCard(t) {
+  var c = el('div', 'card');
+  var h = el('div', 'title', t.subject || '(no subject)');
+  if (t.category) h.appendChild(el('span', 'badge', t.category));
+  c.appendChild(h);
+  c.appendChild(el('div', 'body', t.message || ''));
+  c.appendChild(customerLine(t.customer));
+  c.appendChild(el('div', 'meta', fmt(t.created)));
+  if (t.ownerReply) c.appendChild(el('div', 'reply', 'Aapka jawab: ' + t.ownerReply));
+  if (t.status === 'open') {
+    var ta = el('textarea'); ta.placeholder = 'Customer ko jawab likhiye...';
+    var keep = el('input'); keep.type = 'checkbox'; keep.style.width = 'auto';
+    var kl = el('label', null, ' Ticket open rakhein (band na karein)'); kl.insertBefore(keep, kl.firstChild);
+    var send = el('button', null, 'Reply bhejein');
+    send.onclick = async function () {
+      if (!ta.value.trim()) { say('msg', 'Pehle jawab likhiye.', 'bad'); return; }
+      send.disabled = true;
+      try {
+        await api('POST', '/api/owner/tickets/' + encodeURIComponent(t.id) + '/reply', { reply: ta.value.trim(), close: !keep.checked });
+        say('msg', 'Jawab bhej diya. Customer ko app mein khabar mil gayi.', 'ok'); load(true);
+      } catch (e) { say('msg', e.message, 'bad'); send.disabled = false; }
+    };
+    c.appendChild(ta); c.appendChild(kl); c.appendChild(send);
+  }
+  return c;
+}
+
+function requestCard(r) {
+  var c = el('div', 'card');
+  var h = el('div', 'title', nice(r.type) || 'request');
+  h.appendChild(el('span', 'badge', r.status));
+  c.appendChild(h);
+  if (r.reason) c.appendChild(el('div', 'body', r.reason));
+  if (r.details) c.appendChild(el('div', 'body', r.details));
+  c.appendChild(customerLine(r.customer));
+  c.appendChild(el('div', 'meta', fmt(r.created)));
+  if (r.ownerNote) c.appendChild(el('div', 'reply', 'Aapka note: ' + r.ownerNote));
+  if (r.status === 'pending') {
+    var note = el('input'); note.placeholder = 'Customer ke liye chhota note (zaroori nahi)';
+    c.appendChild(note);
+    c.appendChild(el('div', 'note', 'Approve sirf aapka faisla record karta hai. Asli kaam (jaise Razorpay se refund) aap khud kijiye.'));
+    var row = el('div', 'row');
+    var yes = el('button', 'ok', 'Approve'); var no = el('button', 'bad', 'Reject');
+    var decide = async function (d) {
+      if (!confirm((d === 'approved' ? 'Approve' : 'Reject') + ' karna pakka hai?')) return;
+      yes.disabled = true; no.disabled = true;
+      try {
+        await api('POST', '/api/owner/approvals/' + encodeURIComponent(r.id) + '/decide', { decision: d, note: note.value.trim() });
+        say('msg', 'Faisla record ho gaya (' + d + '). Customer ko khabar mil gayi.', 'ok'); load(true);
+      } catch (e) { say('msg', e.message, 'bad'); yes.disabled = false; no.disabled = false; }
+    };
+    yes.onclick = function () { decide('approved'); };
+    no.onclick = function () { decide('rejected'); };
+    row.appendChild(yes); row.appendChild(no); c.appendChild(row);
+  }
+  return c;
+}
+
+async function load(keepMsg) {
+  var list = $('list'); list.innerHTML = '';
+  if (!keepMsg) say('msg', 'Load ho raha hai...');
+  var status = $('status').value;
+  try {
+    var d = tab === 'tickets' ? await api('GET', '/api/owner/tickets?status=' + status) : await api('GET', '/api/owner/approvals?status=' + status);
+    var items = (tab === 'tickets' ? d.tickets : d.requests) || [];
+    if (!keepMsg) say('msg', items.length + ' mile');
+    if (!items.length) list.appendChild(el('div', 'empty', 'Kuch nahi hai.'));
+    for (var i = 0; i < items.length; i++) list.appendChild(tab === 'tickets' ? ticketCard(items[i]) : requestCard(items[i]));
+  } catch (e) { say('msg', e.message, 'bad'); }
+}
+
+function showTab(name) {
+  tab = name;
+  $('tabTickets').className = name === 'tickets' ? 'on' : '';
+  $('tabReq').className = name === 'requests' ? 'on' : '';
+  setStatusOptions(); load();
+}
+
+$('loginBtn').onclick = async function () {
+  var email = $('email').value.trim(), pass = $('pass').value;
+  if (!email || !pass) { say('loginMsg', 'Email aur password dono likhiye.', 'bad'); return; }
+  $('loginBtn').disabled = true; say('loginMsg', 'Login ho raha hai...');
+  try {
+    await signIn(email, pass);
+    $('pass').value = '';
+    await api('GET', '/api/owner/tickets?status=open');
+    $('loginBox').className = 'card hide'; $('app').className = '';
+    showTab('tickets');
+  } catch (e) { idToken = ''; refreshToken = ''; say('loginMsg', e.message, 'bad'); }
+  $('loginBtn').disabled = false;
+};
+$('pass').onkeydown = function (ev) { if (ev.key === 'Enter') $('loginBtn').click(); };
+$('tabTickets').onclick = function () { showTab('tickets'); };
+$('tabReq').onclick = function () { showTab('requests'); };
+$('status').onchange = function () { load(); };
+$('refreshBtn').onclick = function () { load(); };
+$('logoutBtn').onclick = function () { idToken = ''; refreshToken = ''; location.reload(); };
+</script>
+</body>
+</html>
+`;
+  app.get('/owner', (req, res) => {
+    const key = JSON.stringify(process.env.FIREBASE_API_KEY || '').replace(/</g, '\\u003c');
+    res.set('Cache-Control', 'no-store');
+    res.type('html').send(OWNER_PAGE.replace('__KEY__', () => key));
+  });
+
+  // ---------- PAYMENT TEST PAGE ----------
+  // Open https://secureassistant.onrender.com/paytest while Render has Razorpay TEST keys (rzp_test_...).
+  // It makes a test order, opens Razorpay's test checkout, then waits to see the plan switch on by itself (webhook).
+  // It refuses to continue if the keys are live keys.
+  const PAY_PAGE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Secure Assistant - Payment test</title>
+<style>
+:root{--bg:#f4f5f7;--card:#ffffff;--text:#1b1f24;--muted:#5d6670;--line:#dde1e6;--accent:#1f6feb;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1317;--card:#171c22;--text:#e8ecf0;--muted:#9aa5b1;--line:#2a323b;--accent:#58a6ff;--ok:#3fb950;--bad:#f85149;--warn:#d29922}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:560px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:6px 0 2px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 12px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font:inherit}
+button{font:inherit;border:0;border-radius:10px;padding:11px 14px;background:var(--accent);color:#fff;cursor:pointer;margin-top:12px}
+button:disabled{opacity:.55}
+.msg{min-height:22px;font-size:15px;margin:10px 0;color:var(--muted);white-space:pre-wrap}
+.msg.bad{color:var(--bad)}
+.msg.ok{color:var(--ok);font-weight:600}
+.hint{font-size:13px;color:var(--warn);margin-top:10px}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Payment test (sirf TEST mode)</h1>
+  <p class="sub">Is page se aap Razorpay ka test payment karke dekh sakti hain ki webhook se plan apne aap chalu hota hai ya nahi.</p>
+
+  <div class="card" id="step1">
+    <label for="email">Email (jis account par plan chalu karna hai)</label>
+    <input id="email" type="email" autocomplete="username">
+    <label for="pass">Password</label>
+    <input id="pass" type="password" autocomplete="current-password">
+    <button id="loginBtn">1. Login</button>
+  </div>
+
+  <div class="card hide" id="step2">
+    <label for="cams">Cameras</label>
+    <input id="cams" type="number" min="1" value="1">
+    <label for="bt">Plan</label>
+    <select id="bt"><option value="monthly">monthly</option><option value="yearly">yearly</option></select>
+    <button id="payBtn">2. Order banao aur test payment karo</button>
+    <div class="hint">Test card: 4111 1111 1111 1111, aage ki koi bhi expiry, CVV 123, OTP ya password ke liye Success dabaiye. UPI chunen to success@razorpay likhiye.</div>
+  </div>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<script>
+var API_KEY = __KEY__;
+var POLL_MS = 3000;
+var idToken = '';
+var refreshToken = '';
+
+function $(id) { return document.getElementById(id); }
+function say(t, kind) { var m = $('msg'); m.textContent = t || ''; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function fmt(ms) { return ms ? new Date(ms).toLocaleString('en-IN') : '-'; }
+
+async function signIn(email, password) {
+  if (!API_KEY) throw new Error('Render ke Environment mein FIREBASE_API_KEY set nahi hai.');
+  var r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + encodeURIComponent(API_KEY), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: password, returnSecureToken: true })
+  });
+  var d = await r.json();
+  if (!r.ok) throw new Error((d.error && d.error.message) || 'Login failed');
+  idToken = d.idToken; refreshToken = d.refreshToken;
+}
+
+async function refresh() {
+  var r = await fetch('https://securetoken.googleapis.com/v1/token?key=' + encodeURIComponent(API_KEY), {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(refreshToken)
+  });
+  var d = await r.json();
+  if (!r.ok) throw new Error('Session khatam, dobara login kijiye.');
+  idToken = d.id_token; refreshToken = d.refresh_token;
+}
+
+async function api(method, path, body, retried) {
+  var opt = { method: method, headers: { 'Authorization': 'Bearer ' + idToken } };
+  if (body) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  var r = await fetch(path, opt);
+  if (r.status === 401 && !retried && refreshToken) { await refresh(); return api(method, path, body, true); }
+  var d = {};
+  try { d = await r.json(); } catch (e) { d = {}; }
+  if (!r.ok) throw new Error(d.error || d.message || ('Error ' + r.status));
+  return d;
+}
+
+function loadCheckout() {
+  return new Promise(function (resolve, reject) {
+    if (window.Razorpay) { resolve(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    s.onload = resolve;
+    s.onerror = function () { reject(new Error('Razorpay checkout script load nahi hui. Internet check kijiye.')); };
+    document.head.appendChild(s);
+  });
+}
+
+async function waitForPlan(before) {
+  for (var i = 0; i < 20; i++) {
+    await sleep(POLL_MS);
+    var d = await api('GET', '/api/user/full-box');
+    var sub = d.subscription || {};
+    if (sub.isPro && (sub.planExpiry || 0) > before) {
+      say('PASS: webhook se plan apne aap chalu ho gaya.\\nPlan khatam hoga: ' + fmt(sub.planExpiry), 'ok');
+      return;
+    }
+    say('Payment ho gaya. Webhook ka intezaar... (' + (i + 1) + '/20)');
+  }
+  say('60 second mein plan chalu nahi hua.\\nRazorpay > Webhooks mein recent deliveries dekhiye aur Render ke Logs dekhiye.\\nPayment Capture setting Automatic honi chahiye.', 'bad');
+}
+
+$('loginBtn').onclick = async function () {
+  var email = $('email').value.trim(), pass = $('pass').value;
+  if (!email || !pass) { say('Email aur password dono likhiye.', 'bad'); return; }
+  $('loginBtn').disabled = true; say('Login ho raha hai...');
+  try {
+    await signIn(email, pass);
+    $('pass').value = '';
+    $('step1').className = 'card hide'; $('step2').className = 'card';
+    say('Login ho gaya. Ab niche ka button dabaiye.', 'ok');
+  } catch (e) { say(e.message, 'bad'); }
+  $('loginBtn').disabled = false;
+};
+
+$('payBtn').onclick = async function () {
+  $('payBtn').disabled = true;
+  try {
+    var box = await api('GET', '/api/user/full-box');
+    var before = (box.subscription && box.subscription.planExpiry) || 0;
+    say('Order ban raha hai...');
+    var o = await api('POST', '/api/payment/generate-qr', { cameraCount: Number($('cams').value) || 1, billingType: $('bt').value, timezone: 'Asia/Kolkata' });
+    if (String(o.keyId).indexOf('rzp_test_') !== 0) {
+      say('ROKO: Render mein Razorpay ki LIVE keys lagi hain, isse asli paisa katega.\\nPehle test keys (rzp_test_ se shuru) lagaiye.', 'bad');
+      $('payBtn').disabled = false; return;
+    }
+    await loadCheckout();
+    var rzp = new window.Razorpay({
+      key: o.keyId, order_id: o.orderId, amount: o.total * 100, currency: 'INR',
+      name: 'Secure Assistant (TEST)', description: 'Test payment',
+      handler: function () { say('Payment ho gaya. Webhook ka intezaar...'); waitForPlan(before).then(function () { $('payBtn').disabled = false; }); }
+    });
+    rzp.on('payment.failed', function () { say('Payment fail hua. Dobara try kijiye.', 'bad'); $('payBtn').disabled = false; });
+    say('Razorpay ka test payment box khul raha hai...');
+    rzp.open();
+  } catch (e) { say(e.message, 'bad'); $('payBtn').disabled = false; }
+};
+</script>
+</body>
+</html>
+`;
+  app.get('/paytest', (req, res) => {
+    const key = JSON.stringify(process.env.FIREBASE_API_KEY || '').replace(/</g, '\\u003c');
+    res.set('Cache-Control', 'no-store');
+    res.type('html').send(PAY_PAGE.replace('__KEY__', () => key));
+  });
 };
