@@ -20,7 +20,7 @@ function ask(question, hidden) {
     if (hidden) rl._writeToOutput = s => { rl.output.write(s.includes('\n') || s.includes('\r') ? s : '*'); };
   });
 }
-const stop = msg => { console.error('\nRUKO: ' + msg); process.exit(1); };
+const stop = msg => { console.error('\nSTOP: ' + msg); process.exit(1); };
 
 function readKeyFromEnvFile() {
   for (const f of [path.join(__dirname, '.env'), path.join(__dirname, '..', '.env')]) {
@@ -39,38 +39,38 @@ async function call(method, urlPath, token, body) {
       method, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
       body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(90000)
     });
-  } catch (e) { stop('Server tak nahi pahunch paya (' + e.message + '). Render soya ho sakta hai, 1 minute baad dobara chalaiye.'); }
+  } catch (e) { stop('Could not reach the server (' + e.message + '). Render may be asleep, try again in 1 minute.'); }
   const text = await r.text();
   let data = {}; try { data = JSON.parse(text); } catch (e) { data = {}; }
   return { ok: r.ok, status: r.status, data, text };
 }
 
 const BRANDS = {
-  '1': { name: 'Hikvision jaisa', path: ch => '/Streaming/Channels/' + ch + '01' },
-  '2': { name: 'CP Plus ya Dahua jaisa', path: ch => '/cam/realmonitor?channel=' + ch + '&subtype=0' }
+  '1': { name: 'Hikvision style', path: ch => '/Streaming/Channels/' + ch + '01' },
+  '2': { name: 'CP Plus or Dahua style', path: ch => '/cam/realmonitor?channel=' + ch + '&subtype=0' }
 };
 
 (async () => {
   console.log('\n=== Secure Assistant DVR setup ===\n');
-  const email = await ask('Aapka app wala email: ');
-  const password = await ask('Aapka password (screen par nahi dikhega): ', true);
+  const email = await ask('Your app email: ');
+  const password = await ask('Your password (hidden while typing): ', true);
   console.log('');
   let apiKey = readKeyFromEnvFile();
   if (!apiKey) apiKey = await ask('Firebase Web API key (Firebase > Project settings > General > Web API Key): ');
-  if (!email || !password || !apiKey) stop('Email, password aur API key teeno chahiye.');
+  if (!email || !password || !apiKey) stop('Email, password and API key are all required.');
 
-  console.log('\nDVR ki jaankari (ye sirf is PC par bridge-config.json mein rahegi):');
-  const dvrHost = await ask('DVR ka IP address (jaise 192.168.1.10): ');
+  console.log('\nDVR details (these stay only in bridge-config.json on this PC):');
+  const dvrHost = await ask('DVR IP address (for example 192.168.1.10): ');
   const rtspPort = parseInt(await ask('RTSP port [554]: '), 10) || 554;
-  const dvrUser = await ask('DVR ka username: ');
-  const dvrPass = await ask('DVR ka password (screen par nahi dikhega): ', true);
+  const dvrUser = await ask('DVR username: ');
+  const dvrPass = await ask('DVR password (hidden while typing): ', true);
   console.log('');
-  const brandKey = await ask('DVR kis tarah ka hai? 1 = Hikvision jaisa, 2 = CP Plus ya Dahua jaisa [2]: ');
+  const brandKey = await ask('DVR type? 1 = Hikvision style, 2 = CP Plus or Dahua style [2]: ');
   const brand = BRANDS[brandKey] || BRANDS['2'];
-  const channels = Math.max(1, Math.min(64, parseInt(await ask('Kitne camera channel jodne hain [1]: '), 10) || 1));
-  if (!dvrHost || !dvrUser || !dvrPass) stop('DVR ka IP, username aur password chahiye.');
+  const channels = Math.max(1, Math.min(64, parseInt(await ask('How many camera channels to connect [1]: '), 10) || 1));
+  if (!dvrHost || !dvrUser || !dvrPass) stop('DVR IP, username and password are required.');
 
-  console.log('\nLogin ho raha hai...');
+  console.log('\nLogging in...');
   let login;
   try {
     const r = await fetch(AUTH_URL + '?key=' + encodeURIComponent(apiKey), {
@@ -78,13 +78,13 @@ const BRANDS = {
       body: JSON.stringify({ email, password, returnSecureToken: true }), signal: AbortSignal.timeout(30000)
     });
     login = { ok: r.ok, data: await r.json() };
-  } catch (e) { stop('Login server tak nahi pahunch paya: ' + e.message); }
-  if (!login.ok) stop('Login nahi hua: ' + ((login.data.error && login.data.error.message) || 'galat email, password ya API key'));
+  } catch (e) { stop('Could not reach the login server: ' + e.message); }
+  if (!login.ok) stop('Login failed: ' + ((login.data.error && login.data.error.message) || 'wrong email, password or API key'));
   const token = login.data.idToken;
 
-  console.log('Aapke cameras dekh raha hoon...');
+  console.log('Checking your cameras...');
   const list = await call('GET', '/api/cameras/list', token);
-  if (!list.ok) stop('Camera list nahi mili: ' + (list.data.error || list.status));
+  if (!list.ok) stop('Could not get the camera list: ' + (list.data.error || list.status));
   const existing = {};
   for (const c of list.data.cameras || []) existing[c.name] = c.id;
 
@@ -92,34 +92,34 @@ const BRANDS = {
   for (let ch = 1; ch <= channels; ch++) {
     const name = 'DVR Channel ' + ch;
     let id = existing[name];
-    if (id) console.log('  ' + name + ': pehle se hai, wahi use kar raha hoon');
+    if (id) console.log('  ' + name + ': already exists, reusing it');
     else {
       const rtspUrl = 'rtsp://' + dvrHost + ':' + rtspPort + brand.path(ch); // no username or password in it on purpose
       const r = await call('POST', '/api/cameras/add', token, { type: 'ip_rtsp', name, rtspUrl, locationLabel: 'DVR' });
-      if (!r.ok) stop(name + ' nahi ban paya: ' + (r.data.error || r.status) + (r.status === 403 ? '\nAapke plan mein itne cameras ki ijazat nahi hai. Kam channel chuniye ya plan badhaiye.' : ''));
+      if (!r.ok) stop(name + ' could not be created: ' + (r.data.error || r.status) + (r.status === 403 ? '\nYour plan does not allow this many cameras. Choose fewer channels or upgrade the plan.' : ''));
       id = r.data.id;
-      console.log('  ' + name + ': ban gaya');
+      console.log('  ' + name + ': created');
     }
     cameraIds.push(id);
     cameraRows.push({ cameraId: id, rtspPath: brand.path(ch) });
   }
 
-  console.log('\nBridge server par bana raha hoon...');
+  console.log('\nCreating the bridge on the server...');
   const reg = await call('POST', '/api/dvr/register', token, { name: 'Shop DVR', cameraIds });
-  if (!reg.ok) stop('Bridge nahi bana: ' + (reg.data.error || reg.status) + (reg.status === 403 ? '\nYe sirf paid plan par chalta hai.' : ''));
+  if (!reg.ok) stop('Could not create the bridge: ' + (reg.data.error || reg.status) + (reg.status === 403 ? '\nThis works only on a paid plan.' : ''));
   const found = reg.text.match(/dvr_[a-f0-9]{48}/);
-  if (!found) stop('Server ne bridge bana diya par token nahi dikhaya. Mujhe ye line bhejiye (token ke bina): ' + reg.text.replace(/dvr_[a-f0-9]+/g, 'dvr_...').slice(0, 300));
+  if (!found) stop('The server created the bridge but did not show a token. Send this line (without the token): ' + reg.text.replace(/dvr_[a-f0-9]+/g, 'dvr_...').slice(0, 300));
 
   const cfgFile = path.join(__dirname, 'bridge-config.json');
   if (fs.existsSync(cfgFile)) {
-    const ans = (await ask('\nbridge-config.json pehle se hai. Naye se badal dun? (y = haan, n = nahi): ')).toLowerCase();
-    if (ans !== 'y') stop('Maine kuch nahi badla. Token sirf ek baar dikhta hai, isliye dobara chalakar naya bridge banaiye.');
+    const ans = (await ask('\nbridge-config.json already exists. Replace it with the new one? (y = yes, n = no): ')).toLowerCase();
+    if (ans !== 'y') stop('Nothing was changed. The token is shown only once, so run this again to create a new bridge.');
   }
   const cfg = {
     server: SERVER, token: found[0], dvrHost, rtspPort, username: dvrUser, password: dvrPass,
     intervalSeconds: 120, cameras: cameraRows
   };
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2));
-  console.log('\nHO GAYA. bridge-config.json ban gayi (ye file kisi ko mat dijiye, GitHub par mat daaliye).');
-  console.log('Ab test kijiye:   node dvr-bridge.js --once');
+  console.log('\nDONE. bridge-config.json has been created (do not share it and never put it on GitHub).');
+  console.log('Now test it:   node dvr-bridge.js --once');
 })();

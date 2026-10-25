@@ -99,20 +99,22 @@ const AGENTS = {
 };
 
 // ---------- CATEGORIES ----------
+// The feature lists of every category (liveFeatures, betaFeatures, comingSoonFeatures), its status and its notice
+// are worked out below from the AI tools and their status, so a category can never promise more than the tools deliver.
 const CATEGORIES = [
-  { id: 1, name: 'Home and Residential', subCategories: ['Apartments','Houses','Villas','GatedSociety','Slums and Lanes','Farmhouse','Hostel and PG','Elderly Care at Home','Baby Room'], expertFeatures: ['Intrusion after lock','Fall elders','Fire smoke','Scream audio','Person counting'], toolIds: [3,4,6,7,12,14] },
-  { id: 2, name: 'Education and Learning', subCategories: ['Schools','Colleges','Universities','Coaching Centres','Hostels','Labs','Libraries','Day Care'], expertFeatures: ['Attendance','Crowd gate','Unattended bag','Weapon detection'], toolIds: [3,8,10,11,22] },
-  { id: 3, name: 'Office and Indoor', subCategories: ['Corporate Office','IT Parks','Government Office','CoWorking','Call Centre','Data Centre','Bank Branch','Reception'], expertFeatures: ['Staff attendance','Intrusion after hours','Loitering'], toolIds: [3,4,5,22] },
-  { id: 4, name: 'Lifestyle and Shopping', subCategories: ['Malls','Supermarkets','Kirana and General Stores','Clothes Shops','Jewellery Shops','Medical Stores','Salons and Spas','Gyms','Restaurants and Cafes','Bakeries','Hotels','Garages and Workshops','Electronics Shops','ATMs'], expertFeatures: ['Customer counting','Peak hours','Theft loitering','Daily report'], toolIds: [3,5,10,21] },
-  { id: 5, name: 'Transport and Travel Hubs', subCategories: ['Bus Stands','Railway and Metro Stations','Airports','Parking Lots','Petrol Pumps','EV Charging','Ports','Truck Terminals'], expertFeatures: ['Vehicle detection','Crowd','Unattended baggage'], toolIds: [2,9,10,11] },
-  { id: 6, name: 'Roads and Streets', subCategories: ['National Highways','City Roads','Small Lanes','Toll Plazas','Traffic Signals','Bridges and Tunnels'], expertFeatures: ['Vehicle counting','Peak traffic hours','Accident fall'], toolIds: [2,6,9] },
-  { id: 7, name: 'Industrial Factories and Mines', subCategories: ['Factories','Warehouses','Cold Storage','Mines','Construction Sites','Power Plants','Solar and Wind Farms','Oil and Gas Sites'], expertFeatures: ['Fire smoke alert','Worker safety','Vehicle entry','Intrusion'], toolIds: [4,6,7,9] },
-  { id: 8, name: 'Police Jail Security', subCategories: ['Police Stations','Jails','Courts','Control Rooms'], expertFeatures: ['Weapon detection','Intrusion','Real click proof'], toolIds: [1,4,8,19] },
-  { id: 9, name: 'Religious Places', subCategories: ['Masjid','Mandir','Church','Gurudwara','Dargah','Monastery','Donation Counters'], expertFeatures: ['Crowd management','Unattended bag','Person counting','Live location'], toolIds: [3,10,11,18] },
-  { id: 10, name: 'Health and Medical', subCategories: ['Hospitals','Clinics','Pharmacies','Diagnostic Labs','ICU and Wards','Blood Banks','Veterinary Clinics'], expertFeatures: ['Fall detection','Person counting','Restricted area intrusion','Daily report'], toolIds: [3,4,6,14] },
-  { id: 11, name: 'Agriculture and Farms', subCategories: ['Farms','Poultry Farms','Dairy Farms','Fish Farms','Greenhouses','Mandi and Markets','Grain Storage'], expertFeatures: ['Night intrusion','Vehicle detection','Person counting','Fire alert'], toolIds: [4,7,9,14] },
-  { id: 12, name: 'Outdoor and Public Places', subCategories: ['Parks','Playgrounds','Beaches','Wedding Halls','Stadiums','Zoos','Cinemas','Event Grounds','Tourist Spots'], expertFeatures: ['Crowd detection','Unattended bag','Person counting','Scream audio'], toolIds: [3,10,11,12] },
-  { id: 13, name: 'Other - My Own Business', subCategories: ['Type your own business'], expertFeatures: ['Peak hours','Person counting','Daily report'], toolIds: [3,4,10,14] }
+  { id: 1, name: 'Home and Residential', subCategories: ['Apartments','Houses','Villas','GatedSociety','Slums and Lanes','Farmhouse','Hostel and PG','Elderly Care at Home','Baby Room'], toolIds: [3,4,6,7,12,14] },
+  { id: 2, name: 'Education and Learning', subCategories: ['Schools','Colleges','Universities','Coaching Centres','Hostels','Labs','Libraries','Day Care'], toolIds: [3,8,10,11,22] },
+  { id: 3, name: 'Office and Indoor', subCategories: ['Corporate Office','IT Parks','Government Office','CoWorking','Call Centre','Data Centre','Bank Branch','Reception'], toolIds: [3,4,5,22] },
+  { id: 4, name: 'Lifestyle and Shopping', subCategories: ['Malls','Supermarkets','Kirana and General Stores','Clothes Shops','Jewellery Shops','Medical Stores','Salons and Spas','Gyms','Restaurants and Cafes','Bakeries','Hotels','Garages and Workshops','Electronics Shops','ATMs'], toolIds: [3,5,10,21] },
+  { id: 5, name: 'Transport and Travel Hubs', subCategories: ['Bus Stands','Railway and Metro Stations','Airports','Parking Lots','Petrol Pumps','EV Charging','Ports','Truck Terminals'], toolIds: [2,9,10,11] },
+  { id: 6, name: 'Roads and Streets', subCategories: ['National Highways','City Roads','Small Lanes','Toll Plazas','Traffic Signals','Bridges and Tunnels'], toolIds: [2,6,9] },
+  { id: 7, name: 'Industrial Factories and Mines', subCategories: ['Factories','Warehouses','Cold Storage','Mines','Construction Sites','Power Plants','Solar and Wind Farms','Oil and Gas Sites'], toolIds: [4,6,7,9], disclaimer: 'This is not a certified industrial safety system. Do not use it as your only fire or worker-safety protection.' },
+  { id: 8, name: 'Police Jail Security', subCategories: ['Police Stations','Jails','Courts','Control Rooms'], toolIds: [1,4,8,19], disclaimer: 'This is not a certified or approved system for police, prison, military or other official security use. Use it only as an extra aid.' },
+  { id: 9, name: 'Religious Places', subCategories: ['Masjid','Mandir','Church','Gurudwara','Dargah','Monastery','Donation Counters'], toolIds: [3,10,11,18] },
+  { id: 10, name: 'Health and Medical', subCategories: ['Hospitals','Clinics','Pharmacies','Diagnostic Labs','ICU and Wards','Blood Banks','Veterinary Clinics'], toolIds: [3,4,6,14], disclaimer: 'This is not a medical device. Do not use it to monitor patients or in place of nurse or doctor supervision.' },
+  { id: 11, name: 'Agriculture and Farms', subCategories: ['Farms','Poultry Farms','Dairy Farms','Fish Farms','Greenhouses','Mandi and Markets','Grain Storage'], toolIds: [4,7,9,14] },
+  { id: 12, name: 'Outdoor and Public Places', subCategories: ['Parks','Playgrounds','Beaches','Wedding Halls','Stadiums','Zoos','Cinemas','Event Grounds','Tourist Spots'], toolIds: [3,10,11,12] },
+  { id: 13, name: 'Other - My Own Business', subCategories: ['Type your own business'], toolIds: [3,4,10,14] }
 ];
 
 // ---------- AI TOOLS ----------
@@ -149,6 +151,23 @@ const AI_TOOLS = [
 const LIVE_TOOL_NAMES = AI_TOOLS.filter(t => t.status === 'live').map(t => t.name);
 const BETA_TOOL_NAMES = AI_TOOLS.filter(t => t.status === 'beta').map(t => t.name);
 const COMING_SOON_NAMES = AI_TOOLS.filter(t => t.status === 'coming_soon').map(t => t.name);
+
+// ---------- CATEGORY STATUS (worked out from the tools above) ----------
+// status: live = 2 or more tools work today, limited = 1 tool works today, beta = nothing is fully live but beta tools exist, coming_soon = nothing yet.
+// expertFeatures is kept for older screens and now lists ONLY what works today.
+const GENERAL_DISCLAIMER = 'Alerts are an aid, not a guarantee. Do not rely on the app as your only security or safety measure.';
+const CATEGORY_NOTICE = 'Only the features under liveFeatures work today. betaFeatures are still being tested, so do not rely on them. comingSoonFeatures are not available yet.';
+for (const c of CATEGORIES) {
+  const tools = c.toolIds.map(id => AI_TOOLS.find(t => t.id === id)).filter(Boolean);
+  const names = status => tools.filter(t => t.status === status).map(t => t.name);
+  c.liveFeatures = names('live');
+  c.betaFeatures = names('beta');
+  c.comingSoonFeatures = names('coming_soon');
+  c.expertFeatures = c.liveFeatures;
+  c.status = c.liveFeatures.length >= 2 ? 'live' : c.liveFeatures.length === 1 ? 'limited' : (c.betaFeatures.length ? 'beta' : 'coming_soon');
+  c.notice = CATEGORY_NOTICE;
+  c.disclaimer = c.disclaimer ? c.disclaimer + ' ' + GENERAL_DISCLAIMER : GENERAL_DISCLAIMER;
+}
 
 const CAMERA_METHODS = [
   { id: 1, type: 'qr_scan', name: 'QR Code Scan' },

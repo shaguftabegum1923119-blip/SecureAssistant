@@ -28,7 +28,12 @@ const corsRules = cors({
 // The pages this backend serves itself (/owner and /paytest) call the API from the same address, so they skip the CORS check.
 app.use((req, res, next) => {
   const o = req.headers.origin;
-  if (o && req.headers.host && (o === 'https://' + req.headers.host || o === 'http://' + req.headers.host)) return next();
+  if (o) {
+    try {
+      const mine = [req.headers.host, req.headers['x-forwarded-host']].filter(Boolean).map(h => String(h).split(',')[0].trim().toLowerCase());
+      if (mine.includes(new URL(o).host.toLowerCase())) return next();
+    } catch (e) { /* not a valid Origin, use the normal rules */ }
+  }
   return corsRules(req, res, next);
 });
 app.use(express.json({ limit: '10mb' }));
@@ -54,7 +59,7 @@ for (const file of ['./routes-account', './routes-cameras', './routes-money', '.
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   if (err instanceof multer.MulterError) return res.status(400).json({ error: 'Upload error: ' + err.message });
-  if (err.message === 'CORS blocked') return res.status(403).json({ error: 'CORS blocked' });
+  if (err.message === 'CORS blocked') return res.status(403).json({ error: 'CORS blocked (origin ' + (req.headers.origin || '-') + ', host ' + (req.headers.host || '-') + ')' });
   const status = err.status || 500;
   if (status >= 500) {
     console.error(err);

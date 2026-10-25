@@ -132,7 +132,7 @@ button:disabled{opacity:.55;cursor:default}
 <body>
 <div class="wrap">
   <h1>Secure Assistant - Owner</h1>
-  <p class="sub">Sirf owner ke liye. Customer ka naam, email ya phone yahan nahi dikhta.</p>
+  <p class="sub">For the owner only. Customer name, email and phone are never shown here.</p>
 
   <div id="loginBox" class="card">
     <label for="email">Owner email</label>
@@ -176,7 +176,7 @@ function fmt(ms) { return ms ? new Date(ms).toLocaleString('en-IN') : ''; }
 function nice(s) { return String(s || '').split('_').join(' '); }
 
 async function signIn(email, password) {
-  if (!API_KEY) throw new Error('Render ke Environment mein FIREBASE_API_KEY set nahi hai.');
+  if (!API_KEY) throw new Error('FIREBASE_API_KEY is not set in the Render environment.');
   var r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + encodeURIComponent(API_KEY), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email, password: password, returnSecureToken: true })
@@ -192,7 +192,7 @@ async function refresh() {
     body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(refreshToken)
   });
   var d = await r.json();
-  if (!r.ok) throw new Error('Session khatam ho gaya, dobara login kijiye.');
+  if (!r.ok) throw new Error('Your session has ended. Please log in again.');
   idToken = d.id_token; refreshToken = d.refresh_token;
 }
 
@@ -204,7 +204,7 @@ async function api(method, path, body, retried) {
   var d = {};
   try { d = await r.json(); } catch (e) { d = {}; }
   if (!r.ok) {
-    var err = new Error(r.status === 404 ? 'Ye account owner nahi hai. Render mein OWNER_UID check kijiye.' : (d.error || d.message || ('Error ' + r.status)));
+    var err = new Error(r.status === 404 ? 'This account is not the owner. Check OWNER_UID in Render.' : (d.error || d.message || ('Error ' + r.status)));
     err.status = r.status; throw err;
   }
   return d;
@@ -212,8 +212,8 @@ async function api(method, path, body, retried) {
 
 function customerLine(c) {
   var box = el('div', 'meta');
-  if (!c) { box.textContent = 'Customer: nahi mila (account delete ho gaya ho sakta hai)'; return box; }
-  var plan = c.planActive ? 'Plan chalu' + (c.planExpiry ? ' (' + fmt(c.planExpiry) + ' tak)' : '') : 'Plan chalu nahi';
+  if (!c) { box.textContent = 'Customer not found (the account may have been deleted)'; return box; }
+  var plan = c.planActive ? 'Plan active' + (c.planExpiry ? ' (until ' + fmt(c.planExpiry) + ')' : '') : 'Plan not active';
   box.appendChild(el('span', null, 'Customer ID: ' + c.id + '  |  ' + plan + '  '));
   var b = el('button', 'ghost', 'Copy ID');
   b.style.padding = '3px 9px'; b.style.fontSize = '12px';
@@ -226,7 +226,7 @@ function customerLine(c) {
 
 function setStatusOptions() {
   var s = $('status'); s.innerHTML = '';
-  var opts = tab === 'tickets' ? [['open', 'Open tickets'], ['closed', 'Closed tickets']] : [['pending', 'Pending (jawab baaki)'], ['approved', 'Approved'], ['rejected', 'Rejected']];
+  var opts = tab === 'tickets' ? [['open', 'Open tickets'], ['closed', 'Closed tickets']] : [['pending', 'Pending'], ['approved', 'Approved'], ['rejected', 'Rejected']];
   for (var i = 0; i < opts.length; i++) { var o = el('option', null, opts[i][1]); o.value = opts[i][0]; s.appendChild(o); }
 }
 
@@ -238,18 +238,18 @@ function ticketCard(t) {
   c.appendChild(el('div', 'body', t.message || ''));
   c.appendChild(customerLine(t.customer));
   c.appendChild(el('div', 'meta', fmt(t.created)));
-  if (t.ownerReply) c.appendChild(el('div', 'reply', 'Aapka jawab: ' + t.ownerReply));
+  if (t.ownerReply) c.appendChild(el('div', 'reply', 'Your reply: ' + t.ownerReply));
   if (t.status === 'open') {
-    var ta = el('textarea'); ta.placeholder = 'Customer ko jawab likhiye...';
+    var ta = el('textarea'); ta.placeholder = 'Write a reply to the customer...';
     var keep = el('input'); keep.type = 'checkbox'; keep.style.width = 'auto';
-    var kl = el('label', null, ' Ticket open rakhein (band na karein)'); kl.insertBefore(keep, kl.firstChild);
-    var send = el('button', null, 'Reply bhejein');
+    var kl = el('label', null, ' Keep the ticket open (do not close it)'); kl.insertBefore(keep, kl.firstChild);
+    var send = el('button', null, 'Send reply');
     send.onclick = async function () {
-      if (!ta.value.trim()) { say('msg', 'Pehle jawab likhiye.', 'bad'); return; }
+      if (!ta.value.trim()) { say('msg', 'Please write a reply first.', 'bad'); return; }
       send.disabled = true;
       try {
         await api('POST', '/api/owner/tickets/' + encodeURIComponent(t.id) + '/reply', { reply: ta.value.trim(), close: !keep.checked });
-        say('msg', 'Jawab bhej diya. Customer ko app mein khabar mil gayi.', 'ok'); load(true);
+        say('msg', 'Reply sent. The customer has been notified in the app.', 'ok'); load(true);
       } catch (e) { say('msg', e.message, 'bad'); send.disabled = false; }
     };
     c.appendChild(ta); c.appendChild(kl); c.appendChild(send);
@@ -266,19 +266,19 @@ function requestCard(r) {
   if (r.details) c.appendChild(el('div', 'body', r.details));
   c.appendChild(customerLine(r.customer));
   c.appendChild(el('div', 'meta', fmt(r.created)));
-  if (r.ownerNote) c.appendChild(el('div', 'reply', 'Aapka note: ' + r.ownerNote));
+  if (r.ownerNote) c.appendChild(el('div', 'reply', 'Your note: ' + r.ownerNote));
   if (r.status === 'pending') {
-    var note = el('input'); note.placeholder = 'Customer ke liye chhota note (zaroori nahi)';
+    var note = el('input'); note.placeholder = 'Short note for the customer (optional)';
     c.appendChild(note);
-    c.appendChild(el('div', 'note', 'Approve sirf aapka faisla record karta hai. Asli kaam (jaise Razorpay se refund) aap khud kijiye.'));
+    c.appendChild(el('div', 'note', 'Approve only records your decision. Do the real work (for example the Razorpay refund) yourself.'));
     var row = el('div', 'row');
     var yes = el('button', 'ok', 'Approve'); var no = el('button', 'bad', 'Reject');
     var decide = async function (d) {
-      if (!confirm((d === 'approved' ? 'Approve' : 'Reject') + ' karna pakka hai?')) return;
+      if (!confirm((d === 'approved' ? 'Approve' : 'Reject') + ' this request?')) return;
       yes.disabled = true; no.disabled = true;
       try {
         await api('POST', '/api/owner/approvals/' + encodeURIComponent(r.id) + '/decide', { decision: d, note: note.value.trim() });
-        say('msg', 'Faisla record ho gaya (' + d + '). Customer ko khabar mil gayi.', 'ok'); load(true);
+        say('msg', 'Decision saved (' + d + '). The customer has been notified.', 'ok'); load(true);
       } catch (e) { say('msg', e.message, 'bad'); yes.disabled = false; no.disabled = false; }
     };
     yes.onclick = function () { decide('approved'); };
@@ -290,13 +290,13 @@ function requestCard(r) {
 
 async function load(keepMsg) {
   var list = $('list'); list.innerHTML = '';
-  if (!keepMsg) say('msg', 'Load ho raha hai...');
+  if (!keepMsg) say('msg', 'Loading...');
   var status = $('status').value;
   try {
     var d = tab === 'tickets' ? await api('GET', '/api/owner/tickets?status=' + status) : await api('GET', '/api/owner/approvals?status=' + status);
     var items = (tab === 'tickets' ? d.tickets : d.requests) || [];
-    if (!keepMsg) say('msg', items.length + ' mile');
-    if (!items.length) list.appendChild(el('div', 'empty', 'Kuch nahi hai.'));
+    if (!keepMsg) say('msg', items.length + ' found');
+    if (!items.length) list.appendChild(el('div', 'empty', 'Nothing here.'));
     for (var i = 0; i < items.length; i++) list.appendChild(tab === 'tickets' ? ticketCard(items[i]) : requestCard(items[i]));
   } catch (e) { say('msg', e.message, 'bad'); }
 }
@@ -310,8 +310,8 @@ function showTab(name) {
 
 $('loginBtn').onclick = async function () {
   var email = $('email').value.trim(), pass = $('pass').value;
-  if (!email || !pass) { say('loginMsg', 'Email aur password dono likhiye.', 'bad'); return; }
-  $('loginBtn').disabled = true; say('loginMsg', 'Login ho raha hai...');
+  if (!email || !pass) { say('loginMsg', 'Please enter both email and password.', 'bad'); return; }
+  $('loginBtn').disabled = true; say('loginMsg', 'Logging in...');
   try {
     await signIn(email, pass);
     $('pass').value = '';
@@ -370,11 +370,11 @@ button:disabled{opacity:.55}
 </head>
 <body>
 <div class="wrap">
-  <h1>Payment test (sirf TEST mode)</h1>
-  <p class="sub">Is page se aap Razorpay ka test payment karke dekh sakti hain ki webhook se plan apne aap chalu hota hai ya nahi.</p>
+  <h1>Payment test (TEST mode only)</h1>
+  <p class="sub">Use this page to make a Razorpay test payment and check that your plan switches on by itself through the webhook.</p>
 
   <div class="card" id="step1">
-    <label for="email">Email (jis account par plan chalu karna hai)</label>
+    <label for="email">Email (the account that should get the plan)</label>
     <input id="email" type="email" autocomplete="username">
     <label for="pass">Password</label>
     <input id="pass" type="password" autocomplete="current-password">
@@ -386,8 +386,8 @@ button:disabled{opacity:.55}
     <input id="cams" type="number" min="1" value="1">
     <label for="bt">Plan</label>
     <select id="bt"><option value="monthly">monthly</option><option value="yearly">yearly</option></select>
-    <button id="payBtn">2. Order banao aur test payment karo</button>
-    <div class="hint">Test card: 4111 1111 1111 1111, aage ki koi bhi expiry, CVV 123, OTP ya password ke liye Success dabaiye. UPI chunen to success@razorpay likhiye.</div>
+    <button id="payBtn">2. Create order and pay (test)</button>
+    <div class="hint">Test card: 4111 1111 1111 1111, any future expiry, CVV 123. On the bank page choose Success. For UPI use success@razorpay.</div>
   </div>
 
   <div class="msg" id="msg"></div>
@@ -405,7 +405,7 @@ function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 function fmt(ms) { return ms ? new Date(ms).toLocaleString('en-IN') : '-'; }
 
 async function signIn(email, password) {
-  if (!API_KEY) throw new Error('Render ke Environment mein FIREBASE_API_KEY set nahi hai.');
+  if (!API_KEY) throw new Error('FIREBASE_API_KEY is not set in the Render environment.');
   var r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + encodeURIComponent(API_KEY), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email, password: password, returnSecureToken: true })
@@ -421,7 +421,7 @@ async function refresh() {
     body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(refreshToken)
   });
   var d = await r.json();
-  if (!r.ok) throw new Error('Session khatam, dobara login kijiye.');
+  if (!r.ok) throw new Error('Session ended, please log in again.');
   idToken = d.id_token; refreshToken = d.refresh_token;
 }
 
@@ -442,7 +442,7 @@ function loadCheckout() {
     var s = document.createElement('script');
     s.src = 'https://checkout.razorpay.com/v1/checkout.js';
     s.onload = resolve;
-    s.onerror = function () { reject(new Error('Razorpay checkout script load nahi hui. Internet check kijiye.')); };
+    s.onerror = function () { reject(new Error('Could not load Razorpay checkout. Check your internet.')); };
     document.head.appendChild(s);
   });
 }
@@ -453,23 +453,23 @@ async function waitForPlan(before) {
     var d = await api('GET', '/api/user/full-box');
     var sub = d.subscription || {};
     if (sub.isPro && (sub.planExpiry || 0) > before) {
-      say('PASS: webhook se plan apne aap chalu ho gaya.\\nPlan khatam hoga: ' + fmt(sub.planExpiry), 'ok');
+      say('PASS: the plan was switched on by the webhook.\\nPlan ends: ' + fmt(sub.planExpiry), 'ok');
       return;
     }
-    say('Payment ho gaya. Webhook ka intezaar... (' + (i + 1) + '/20)');
+    say('Payment done. Waiting for the webhook... (' + (i + 1) + '/20)');
   }
-  say('60 second mein plan chalu nahi hua.\\nRazorpay > Webhooks mein recent deliveries dekhiye aur Render ke Logs dekhiye.\\nPayment Capture setting Automatic honi chahiye.', 'bad');
+  say('The plan did not switch on within 60 seconds.\\nCheck recent deliveries under Razorpay > Webhooks and the Render logs.\\nPayment Capture must be set to Automatic.', 'bad');
 }
 
 $('loginBtn').onclick = async function () {
   var email = $('email').value.trim(), pass = $('pass').value;
-  if (!email || !pass) { say('Email aur password dono likhiye.', 'bad'); return; }
-  $('loginBtn').disabled = true; say('Login ho raha hai...');
+  if (!email || !pass) { say('Please enter both email and password.', 'bad'); return; }
+  $('loginBtn').disabled = true; say('Logging in...');
   try {
     await signIn(email, pass);
     $('pass').value = '';
     $('step1').className = 'card hide'; $('step2').className = 'card';
-    say('Login ho gaya. Ab niche ka button dabaiye.', 'ok');
+    say('Logged in. Now press the button below.', 'ok');
   } catch (e) { say(e.message, 'bad'); }
   $('loginBtn').disabled = false;
 };
@@ -479,20 +479,20 @@ $('payBtn').onclick = async function () {
   try {
     var box = await api('GET', '/api/user/full-box');
     var before = (box.subscription && box.subscription.planExpiry) || 0;
-    say('Order ban raha hai...');
+    say('Creating the order...');
     var o = await api('POST', '/api/payment/generate-qr', { cameraCount: Number($('cams').value) || 1, billingType: $('bt').value, timezone: 'Asia/Kolkata' });
     if (String(o.keyId).indexOf('rzp_test_') !== 0) {
-      say('ROKO: Render mein Razorpay ki LIVE keys lagi hain, isse asli paisa katega.\\nPehle test keys (rzp_test_ se shuru) lagaiye.', 'bad');
+      say('STOP: Render has LIVE Razorpay keys, so this would charge real money.\\nPut the test keys (starting with rzp_test_) in Render first.', 'bad');
       $('payBtn').disabled = false; return;
     }
     await loadCheckout();
     var rzp = new window.Razorpay({
       key: o.keyId, order_id: o.orderId, amount: o.total * 100, currency: 'INR',
       name: 'Secure Assistant (TEST)', description: 'Test payment',
-      handler: function () { say('Payment ho gaya. Webhook ka intezaar...'); waitForPlan(before).then(function () { $('payBtn').disabled = false; }); }
+      handler: function () { say('Payment done. Waiting for the webhook...'); waitForPlan(before).then(function () { $('payBtn').disabled = false; }); }
     });
-    rzp.on('payment.failed', function () { say('Payment fail hua. Dobara try kijiye.', 'bad'); $('payBtn').disabled = false; });
-    say('Razorpay ka test payment box khul raha hai...');
+    rzp.on('payment.failed', function () { say('Payment failed. Please try again.', 'bad'); $('payBtn').disabled = false; });
+    say('Opening the Razorpay test checkout...');
     rzp.open();
   } catch (e) { say(e.message, 'bad'); $('payBtn').disabled = false; }
 };
