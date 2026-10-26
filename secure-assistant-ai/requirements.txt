@@ -1,7 +1,10 @@
-flask-cors==4.0.0
-ultralytics==8.3.0
-Pillow==10.4.0
-numpy==1.26.4
-opencv-python-headless==4.9.0.80
-gunicorn==21.2.0
+--extra-index-url https://download.pytorch.org/whl/cpu
 flask>=3.0,<4
+flask-cors==4.0.0
+gunicorn==21.2.0
+numpy==1.26.4
+Pillow==10.4.0
+opencv-python-headless==4.9.0.80
+torch==2.4.1+cpu
+torchvision==0.19.1+cpu
+ultralytics==8.3.0

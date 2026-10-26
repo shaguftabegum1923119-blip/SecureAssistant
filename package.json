@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js && node --check core.js && node --check routes-account.js && node --check routes-cameras.js && node --check routes-money.js && node --check routes-wahab.js && node --check cron.js && node --check staticData.js"
+    "check": "node --check index.js && node --check core.js && node --check b2Storage.js && node --check routes-account.js && node --check routes-cameras.js && node --check routes-money.js && node --check routes-wahab.js && node --check routes-help.js && node --check routes-agent.js && node --check routes-dvr.js && node --check routes-owner.js && node --check routes-pdf.js && node --check cron.js && node --check staticData.js"
   },
   "engines": {
     "node": ">=18"
@@ -24,6 +24,8 @@
     "libphonenumber-js": "^1.11.0",
     "multer": "^2.0.0",
     "node-fetch": "^3.3.2",
-    "razorpay": "^2.9.4"
+    "pdfkit": "^0.15.0",
+    "razorpay": "^2.9.4",
+    "sharp": "^0.33.5"
   }
 }
