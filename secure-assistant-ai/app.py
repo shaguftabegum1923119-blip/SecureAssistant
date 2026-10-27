@@ -72,12 +72,26 @@ def get_model():
 
 
 def _warm_up():
-    log("warm-up thread started")
+    log("warm-up thread started (process " + str(os.getpid()) + ")")
     try:
         get_model()
     except BaseException:
         log("warm-up ended with an error")
 
+
+def _reset_after_fork():
+    # The server may load this file once and then copy it into the worker process.
+    # A copied loader thread and lock do not work, so the worker starts its own clean load.
+    global _model, _model_error, _model_state, _model_lock
+    _model = None
+    _model_error = None
+    _model_state = "not started"
+    _model_lock = threading.Lock()
+    threading.Thread(target=_warm_up, daemon=True).start()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_after_fork)
 
 threading.Thread(target=_warm_up, daemon=True).start()
 
