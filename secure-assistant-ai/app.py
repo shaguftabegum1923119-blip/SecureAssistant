@@ -5,6 +5,7 @@ import hmac
 import os
 import tempfile
 import threading
+import time
 
 import cv2
 from flask import Flask, jsonify, request
@@ -12,6 +13,10 @@ from PIL import Image
 from ultralytics import YOLO
 
 app = Flask(__name__)
+
+
+def log(msg):
+    print("[ai] " + str(msg), flush=True)
 
 
 def env_num(name, default, cast=float):
@@ -31,6 +36,7 @@ VIDEO_EXT = (".mp4", ".mov", ".avi", ".mkv", ".webm", ".3gp")
 
 _model = None
 _model_error = None
+_model_state = "not started"
 _model_lock = threading.Lock()
 
 
@@ -43,26 +49,34 @@ def model_path():
 
 
 def get_model():
-    global _model, _model_error
+    global _model, _model_error, _model_state
     if _model is not None:
         return _model
     with _model_lock:
         if _model is None:
+            started = time.time()
+            path = model_path()
+            _model_state = "loading"
+            log("loading model from " + path)
             try:
-                _model = YOLO(model_path())
+                _model = YOLO(path)
                 _model_error = None
-            except Exception as e:
-                _model_error = str(e)[:200]
-                app.logger.exception("model load failed")
+                _model_state = "loaded"
+                log("model loaded in %.1f sec" % (time.time() - started))
+            except BaseException as e:
+                _model_error = (type(e).__name__ + ": " + str(e))[:200]
+                _model_state = "failed"
+                log("model load FAILED: " + _model_error)
                 raise
     return _model
 
 
 def _warm_up():
+    log("warm-up thread started")
     try:
         get_model()
-    except Exception:
-        pass
+    except BaseException:
+        log("warm-up ended with an error")
 
 
 threading.Thread(target=_warm_up, daemon=True).start()
@@ -113,7 +127,7 @@ def detect_video(path):
 @app.route("/health")
 def home():
     return jsonify({"status": "SecureAssistant AI live", "model": "yolov8n (80 COCO objects, lightweight mode)",
-                    "modelLoaded": _model is not None, "modelError": _model_error})
+                    "modelLoaded": _model is not None, "modelState": _model_state, "modelError": _model_error})
 
 
 @app.route("/detect", methods=["POST"])
