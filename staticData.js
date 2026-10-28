@@ -119,12 +119,12 @@ const CATEGORIES = [
 
 // ---------- AI TOOLS ----------
 const TOOL_STATUS = {
-  1: 'coming_soon', 2: 'coming_soon', 3: 'live', 4: 'beta', 5: 'coming_soon', 6: 'coming_soon', 7: 'coming_soon', 8: 'coming_soon',
+  1: 'live', 2: 'coming_soon', 3: 'live', 4: 'beta', 5: 'coming_soon', 6: 'coming_soon', 7: 'coming_soon', 8: 'coming_soon',
   9: 'live', 10: 'live', 11: 'coming_soon', 12: 'coming_soon', 13: 'coming_soon', 14: 'beta', 15: 'live', 16: 'live', 17: 'beta',
   18: 'beta', 19: 'beta', 20: 'live', 21: 'coming_soon', 22: 'coming_soon'
 };
 const AI_TOOLS = [
-  { id: 1, name: 'Face Detection and Recognition', work: 'Recognize known or new visitors', proof: 'Photo with time before and after', action: 'If known, show prior visits; if new, mark first time', whereUsed: 'Home, Education, Office, Shopping, Police' },
+  { id: 1, name: 'Face Matching (Consent Based)', work: 'Match a face in a photo against people saved with their consent, such as staff or known visitors. It works on photos you send and does not watch cameras on its own. Only a numeric face code is stored, never the photo.', proof: 'Match result with a confidence score', action: 'Show the matched person name, or no match', whereUsed: 'Home, Education, Office, Shopping, Police' },
   { id: 2, name: 'Number Plate Recognition ANPR', work: 'Read vehicle number plates', proof: 'Photo with plate number', action: 'Log entry/exit time with photo', whereUsed: 'Transport, Roads, Industrial' },
   { id: 3, name: 'Person Detection and Counting', work: 'Count people seen in camera frames', proof: 'Counts per hour and day', action: 'Show in daily report', whereUsed: 'All categories' },
   { id: 4, name: 'Intrusion Detection', work: 'Alert when a person is counted on camera during the closed hours you set (no photo is stored)', proof: 'Alert with time', action: 'Push notification with time', whereUsed: 'Home, Office, Shopping, Industrial, Health, Agriculture' },
