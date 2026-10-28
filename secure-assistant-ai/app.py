@@ -1,6 +1,7 @@
-# Secure Assistant AI service (Flask + YOLOv8n)
+# Secure Assistant AI service (Flask + YOLOv8n + face templates)
 # Detects 80 common objects (person, car, bag, etc.) in photos and videos.
-# It does NOT do face recognition, number plates, fire or weapon detection yet.
+# Face templates (OpenCV YuNet + SFace) are made only for people added with their consent.
+# It does NOT do number plates, fire or weapon detection yet.
 import hmac
 import os
 import tempfile
@@ -8,11 +9,13 @@ import threading
 import time
 
 import cv2
+import numpy as np
 from flask import Flask, jsonify, request
 from PIL import Image
 from ultralytics import YOLO
 
 app = Flask(__name__)
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def log(msg):
@@ -34,17 +37,28 @@ MAX_FRAMES = env_num("MAX_VIDEO_FRAMES", 8, int)
 IMG_SIZE = env_num("YOLO_IMG_SIZE", 320, int)
 VIDEO_EXT = (".mp4", ".mov", ".avi", ".mkv", ".webm", ".3gp")
 
+FACE_DET_PATH = os.environ.get("FACE_DET_MODEL") or os.path.join(HERE, "face_detection_yunet_2023mar.onnx")
+FACE_REC_PATH = os.environ.get("FACE_REC_MODEL") or os.path.join(HERE, "face_recognition_sface_2021dec.onnx")
+FACE_DET_SCORE = env_num("FACE_DET_SCORE", 0.85)
+FACE_MAX_FACES = env_num("FACE_MAX_FACES", 5, int)
+
 _model = None
 _model_error = None
 _model_state = "not started"
 _model_lock = threading.Lock()
+
+_face = {"det": None, "rec": None}
+_face_error = None
+_face_state = "not loaded"
+_face_lock = threading.Lock()
+_face_run_lock = threading.Lock()
 
 
 def model_path():
     custom = os.environ.get("YOLO_MODEL")
     if custom:
         return custom
-    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yolov8n.pt")
+    here = os.path.join(HERE, "yolov8n.pt")
     return here if os.path.exists(here) else "yolov8n.pt"
 
 
@@ -71,22 +85,51 @@ def get_model():
     return _model
 
 
+def get_face_models():
+    global _face_error, _face_state
+    if _face["det"] is not None and _face["rec"] is not None:
+        return _face["det"], _face["rec"]
+    with _face_lock:
+        if _face["det"] is None or _face["rec"] is None:
+            try:
+                for path, minimum in ((FACE_DET_PATH, 100000), (FACE_REC_PATH, 1000000)):
+                    if not os.path.exists(path) or os.path.getsize(path) < minimum:
+                        raise RuntimeError("face model file missing or incomplete: " + os.path.basename(path))
+                _face["det"] = cv2.FaceDetectorYN.create(FACE_DET_PATH, "", (320, 320), FACE_DET_SCORE, 0.3, 5000)
+                _face["rec"] = cv2.FaceRecognizerSF.create(FACE_REC_PATH, "")
+                _face_error = None
+                _face_state = "ready"
+                log("face models loaded")
+            except BaseException as e:
+                _face_error = (type(e).__name__ + ": " + str(e))[:200]
+                _face_state = "failed"
+                log("face model load FAILED: " + _face_error)
+                raise
+    return _face["det"], _face["rec"]
+
+
 def _warm_up():
     log("warm-up thread started (process " + str(os.getpid()) + ")")
     try:
         get_model()
     except BaseException:
         log("warm-up ended with an error")
+    try:
+        get_face_models()
+    except BaseException:
+        log("face warm-up ended with an error")
 
 
 def _reset_after_fork():
     # The server may load this file once and then copy it into the worker process.
     # A copied loader thread and lock do not work, so the worker starts its own clean load.
-    global _model, _model_error, _model_state, _model_lock
+    global _model, _model_error, _model_state, _model_lock, _face_lock, _face_run_lock
     _model = None
     _model_error = None
     _model_state = "not started"
     _model_lock = threading.Lock()
+    _face_lock = threading.Lock()
+    _face_run_lock = threading.Lock()
     threading.Thread(target=_warm_up, daemon=True).start()
 
 
@@ -137,11 +180,42 @@ def detect_video(path):
     return list(best.values()), analyzed
 
 
+def face_embeddings(bgr):
+    """Returns up to FACE_MAX_FACES faces (largest first), each with a unit-length 128-number template."""
+    det, rec = get_face_models()
+    h, w = bgr.shape[:2]
+    scale = min(1.0, 640.0 / max(h, w))
+    if scale < 1.0:
+        bgr = cv2.resize(bgr, (max(1, int(w * scale)), max(1, int(h * scale))))
+        h, w = bgr.shape[:2]
+    out = []
+    with _face_run_lock:
+        det.setInputSize((w, h))
+        _, faces = det.detect(bgr)
+        if faces is None or len(faces) == 0:
+            return out
+        order = np.argsort(-(faces[:, 2] * faces[:, 3]))[:FACE_MAX_FACES]
+        for i in order:
+            row = faces[i]
+            feat = rec.feature(rec.alignCrop(bgr, row)).flatten().astype(np.float64)
+            norm = float(np.linalg.norm(feat))
+            if norm == 0:
+                continue
+            out.append({
+                "embedding": [round(float(v), 6) for v in (feat / norm)],
+                "box": [round(float(row[0]) / w, 3), round(float(row[1]) / h, 3),
+                        round(float(row[2]) / w, 3), round(float(row[3]) / h, 3)],
+                "detScore": round(float(row[14]), 3)
+            })
+    return out
+
+
 @app.route("/")
 @app.route("/health")
 def home():
     return jsonify({"status": "SecureAssistant AI live", "model": "yolov8n (80 COCO objects, lightweight mode)",
-                    "modelLoaded": _model is not None, "modelState": _model_state, "modelError": _model_error})
+                    "modelLoaded": _model is not None, "modelState": _model_state, "modelError": _model_error,
+                    "faceModels": _face_state, "faceError": _face_error})
 
 
 @app.route("/detect", methods=["POST"])
@@ -173,6 +247,28 @@ def detect():
     except Exception as e:
         app.logger.exception("detect failed")
         return jsonify({"error": "could not process file"}), 400
+
+
+@app.route("/face/embed", methods=["POST"])
+def face_embed():
+    if not authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    f = request.files.get("file") or request.files.get("image")
+    if f is None:
+        return jsonify({"error": "no file"}), 400
+    try:
+        get_face_models()
+    except Exception:
+        return jsonify({"error": "face models not ready"}), 503
+    img = cv2.imdecode(np.frombuffer(f.read(), dtype=np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
+        return jsonify({"error": "could not read the photo"}), 400
+    try:
+        faces = face_embeddings(img)
+    except Exception:
+        app.logger.exception("face embed failed")
+        return jsonify({"error": "could not process the photo"}), 400
+    return jsonify({"count": len(faces), "faces": faces})
 
 
 if __name__ == "__main__":
