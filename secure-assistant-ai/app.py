@@ -1,7 +1,9 @@
-# Secure Assistant AI service (Flask + YOLOv8n + face templates)
-# Detects 80 common objects (person, car, bag, etc.) in photos and videos.
+# Secure Assistant AI service (Flask).
+# YOLOv8n finds 80 common objects (people, bags, vehicles, etc.) in photos and videos.
+# /detect/boxes also returns WHERE each person and bag is in the picture (used for unattended-bag and loitering checks).
 # Face templates (OpenCV YuNet + SFace) are made only for people added with their consent.
 # It does NOT do number plates, fire or weapon detection yet.
+
 import hmac
 import os
 import tempfile
@@ -41,6 +43,10 @@ FACE_DET_PATH = os.environ.get("FACE_DET_MODEL") or os.path.join(HERE, "face_det
 FACE_REC_PATH = os.environ.get("FACE_REC_MODEL") or os.path.join(HERE, "face_recognition_sface_2021dec.onnx")
 FACE_DET_SCORE = env_num("FACE_DET_SCORE", 0.85)
 FACE_MAX_FACES = env_num("FACE_MAX_FACES", 5, int)
+
+# Objects that /detect/boxes reports with their positions (people and bags only).
+WATCH_LABELS = ("person", "backpack", "handbag", "suitcase")
+BOX_IMG_SIZE = env_num("YOLO_BOX_IMG_SIZE", 640, int)
 
 _model = None
 _model_error = None
@@ -180,6 +186,29 @@ def detect_video(path):
     return list(best.values()), analyzed
 
 
+def detect_boxes(img):
+    """People and bags in one picture, each with its position as fractions (0 to 1) of the picture width and height."""
+    model = get_model()
+    width, height = img.size
+    found = []
+    for r in model(img, verbose=False, imgsz=BOX_IMG_SIZE):
+        for box in r.boxes:
+            label = model.names[int(box.cls[0])]
+            if label not in WATCH_LABELS:
+                continue
+            conf = float(box.conf[0])
+            if conf < MIN_CONF:
+                continue
+            x1, y1, x2, y2 = [float(v) for v in box.xyxy[0]]
+            found.append({
+                "label": label,
+                "confidence": round(conf, 2),
+                "box": [round(min(1.0, max(0.0, x1 / width)), 3), round(min(1.0, max(0.0, y1 / height)), 3),
+                        round(min(1.0, max(0.0, x2 / width)), 3), round(min(1.0, max(0.0, y2 / height)), 3)]
+            })
+    return found
+
+
 def face_embeddings(bgr):
     """Returns up to FACE_MAX_FACES faces (largest first), each with a unit-length 128-number template."""
     det, rec = get_face_models()
@@ -247,6 +276,26 @@ def detect():
     except Exception as e:
         app.logger.exception("detect failed")
         return jsonify({"error": "could not process file"}), 400
+
+
+@app.route("/detect/boxes", methods=["POST"])
+def detect_boxes_route():
+    if not authorized():
+        return jsonify({"error": "unauthorized"}), 401
+    f = request.files.get("file") or request.files.get("image")
+    if f is None:
+        return jsonify({"error": "no file"}), 400
+    try:
+        get_model()
+    except Exception:
+        return jsonify({"error": "model not ready, try again in a minute"}), 503
+    try:
+        img = Image.open(f.stream).convert("RGB")
+        objects = detect_boxes(img)
+        return jsonify({"width": img.size[0], "height": img.size[1], "objects": objects, "count": len(objects)})
+    except Exception:
+        app.logger.exception("detect boxes failed")
+        return jsonify({"error": "could not process the photo"}), 400
 
 
 @app.route("/face/embed", methods=["POST"])

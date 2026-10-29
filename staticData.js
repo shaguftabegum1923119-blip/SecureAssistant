@@ -118,9 +118,10 @@ const CATEGORIES = [
 ];
 
 // ---------- AI TOOLS ----------
+// Status words: live = works today, beta = built but not fully tested on real cameras (do not rely on it), coming_soon = not available.
 const TOOL_STATUS = {
-  1: 'live', 2: 'coming_soon', 3: 'live', 4: 'beta', 5: 'coming_soon', 6: 'coming_soon', 7: 'coming_soon', 8: 'coming_soon',
-  9: 'live', 10: 'live', 11: 'coming_soon', 12: 'coming_soon', 13: 'coming_soon', 14: 'beta', 15: 'live', 16: 'live', 17: 'beta',
+  1: 'live', 2: 'coming_soon', 3: 'live', 4: 'beta', 5: 'beta', 6: 'beta', 7: 'coming_soon', 8: 'coming_soon',
+  9: 'live', 10: 'live', 11: 'beta', 12: 'coming_soon', 13: 'coming_soon', 14: 'beta', 15: 'live', 16: 'live', 17: 'beta',
   18: 'beta', 19: 'beta', 20: 'live', 21: 'coming_soon', 22: 'coming_soon'
 };
 const AI_TOOLS = [
@@ -128,13 +129,13 @@ const AI_TOOLS = [
   { id: 2, name: 'Number Plate Recognition ANPR', work: 'Read vehicle number plates', proof: 'Photo with plate number', action: 'Log entry/exit time with photo', whereUsed: 'Transport, Roads, Industrial' },
   { id: 3, name: 'Person Detection and Counting', work: 'Count people seen in camera frames', proof: 'Counts per hour and day', action: 'Show in daily report', whereUsed: 'All categories' },
   { id: 4, name: 'Intrusion Detection', work: 'Alert when a person is counted on camera during the closed hours you set (no photo is stored)', proof: 'Alert with time', action: 'Push notification with time', whereUsed: 'Home, Office, Shopping, Industrial, Health, Agriculture' },
-  { id: 5, name: 'Loitering Detection', work: 'Person staying in one area for long', proof: 'Photo with time', action: 'Theft-risk alert', whereUsed: 'Office, Shopping' },
-  { id: 6, name: 'Fall Detection', work: 'Person falls alert', proof: 'Photo of the event', action: 'Emergency alert with location', whereUsed: 'Home elders, Roads, Health' },
+  { id: 5, name: 'Loitering Detection', work: 'Alert when a person stays in the same small area for a long time (no photo is stored). Staff who always stand in one place can cause wrong alerts, so choose a zone', proof: 'Alert with time', action: 'Push notification', whereUsed: 'Office, Shopping' },
+  { id: 6, name: 'Person Down Detection (Possible Fall)', work: 'Alert when a person lies on the floor without moving for about a minute, which may be a fall (no photo is stored). It cannot tell a fall from lying down on purpose, can miss a fall the camera did not see, and is not a medical device', proof: 'Alert with time', action: 'Push notification', whereUsed: 'Home elders, Roads, Health' },
   { id: 7, name: 'Fire and Smoke Detection', work: 'Fire and smoke alert', proof: 'Photo of the event', action: 'High-priority alert', whereUsed: 'Home kitchen, Industrial, Agriculture' },
   { id: 8, name: 'Weapon Detection', work: 'Weapon in hand alert', proof: 'Photo of the event', action: 'High security alert', whereUsed: 'Police, Education, Malls' },
   { id: 9, name: 'Vehicle Detection', work: 'Count cars, bikes, buses and trucks in frames', proof: 'Counts per hour and day', action: 'Show in daily report', whereUsed: 'Transport, Roads, Industrial, Agriculture' },
   { id: 10, name: 'Crowd Detection', work: 'Alert when people counted on camera cross the limit you set', proof: 'Alert with count and time', action: 'Push notification', whereUsed: 'Education, Transport, Religious, Outdoor, Shopping' },
-  { id: 11, name: 'Unattended Baggage Detection', work: 'Bag left alone alert', proof: 'Photo of the event', action: 'Security alert', whereUsed: 'Transport, Education, Religious, Outdoor' },
+  { id: 11, name: 'Unattended Baggage Detection', work: 'Alert when a bag has had nobody near it for a few minutes (no photo is stored)', proof: 'Alert with time', action: 'Push notification', whereUsed: 'Transport, Education, Religious, Outdoor' },
   { id: 12, name: 'Audio Anomaly Scream Detection', work: 'Scream or breaking sound alert', proof: 'Audio clip with time', action: 'Audio alert with live location', whereUsed: 'Home, Outdoor, Roads' },
   { id: 13, name: 'Visitor Background Intelligence', work: 'Visit history of known visitors', proof: 'History with photos', action: 'Show full history on search', whereUsed: 'All categories' },
   { id: 14, name: 'Offline Revive and Rewind', work: 'Phone records while offline and uploads when internet returns', proof: 'Clip with upload time', action: 'Auto rewind when back online', whereUsed: 'All categories' },

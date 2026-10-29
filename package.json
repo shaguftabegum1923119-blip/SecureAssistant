@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js && node --check core.js && node --check b2Storage.js && node --check routes-account.js && node --check routes-cameras.js && node --check routes-money.js && node --check routes-wahab.js && node --check routes-help.js && node --check routes-agent.js && node --check routes-dvr.js && node --check routes-owner.js && node --check routes-pdf.js && node --check cron.js && node --check staticData.js"
+    "check": "node --check index.js && node --check core.js && node --check b2Storage.js && node --check routes-account.js && node --check routes-cameras.js && node --check routes-money.js && node --check routes-play.js && node --check routes-facematch.js && node --check routes-watch.js && node --check routes-wahab.js && node --check routes-help.js && node --check routes-agent.js && node --check routes-dvr.js && node --check routes-owner.js && node --check routes-pdf.js && node --check cron.js && node --check staticData.js"
   },
   "engines": {
     "node": ">=18"
@@ -19,7 +19,7 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
     "firebase-admin": "^12.7.0",
-    "form-data": "^4.0.6",
+    "form-data": "^4.0.0",
     "helmet": "^7.1.0",
     "libphonenumber-js": "^1.11.0",
     "multer": "^2.0.0",

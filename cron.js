@@ -122,6 +122,20 @@ module.exports = function register(app, core) {
     res.json({ ok: true, cleaned, freedBytes, packs });
   }));
 
+  // Removes the small position notes of the Watch tools (watch_state) after their 2-day expiry. Run once a day.
+  app.post('/api/cron/watch-cleanup', requireCron, wrap(async (req, res) => {
+    let deleted = 0;
+    for (let round = 0; round < 10; round++) {
+      const snap = await db.collection('watch_state').where('expiresAt', '<', new Date()).limit(300).get();
+      if (snap.empty) break;
+      const batch = db.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      deleted += snap.size;
+    }
+    res.json({ ok: true, deleted });
+  }));
+
   app.post('/api/cron/process-deletions', requireCron, wrap(async (req, res) => {
     const snap = await db.collection('users').where('deletionStatus', '==', 'pending').limit(20).get();
     let done = 0;

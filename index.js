@@ -1,6 +1,6 @@
 'use strict';
 // SECURE ASSISTANT BACKEND - V15 (main file).
-// Files: index.js, core.js, b2Storage.js, routes-account.js, routes-cameras.js, routes-money.js, routes-play.js, routes-facematch.js, routes-wahab.js, routes-help.js, routes-agent.js, routes-dvr.js, routes-owner.js, routes-pdf.js, cron.js, staticData.js, plus the folder legal/ with the 4 legal pages.
+// Files: index.js, core.js, b2Storage.js, routes-account.js, routes-cameras.js, routes-money.js, routes-play.js, routes-facematch.js, routes-watch.js, routes-wahab.js, routes-help.js, routes-agent.js, routes-dvr.js, routes-owner.js, routes-pdf.js, cron.js, staticData.js, plus the folder legal/ with the 4 legal pages.
 const path = require('path');
 const core = require('./core');
 const { PORT, clientIp, cors, express, helmet, multer, notifyOwner, rateLimit } = core;
@@ -51,7 +51,7 @@ app.use(rateLimit({
 app.use(express.static(path.join(__dirname, 'legal'), { extensions: ['html'], maxAge: '1h' }));
 
 // Route files, loaded in this order
-for (const file of ['./routes-account', './routes-cameras', './routes-money', './routes-play', './routes-facematch', './routes-wahab', './routes-help', './routes-agent', './routes-dvr', './routes-owner', './routes-pdf', './cron']) {
+for (const file of ['./routes-account', './routes-cameras', './routes-money', './routes-play', './routes-facematch', './routes-watch', './routes-wahab', './routes-help', './routes-agent', './routes-dvr', './routes-owner', './routes-pdf', './cron']) {
   require(file)(app, core);
 }
 

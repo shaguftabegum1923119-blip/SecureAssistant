@@ -1,0 +1,14 @@
+{
+  "_help": "Copy this file to bridge-config.json and fill it. Keep bridge-config.json private (it holds the token and the DVR password).",
+  "server": "https://secureassistant.onrender.com",
+  "token": "dvr_PASTE_THE_TOKEN_THE_APP_SHOWED_ONCE",
+  "dvrHost": "192.168.1.10",
+  "rtspPort": 554,
+  "username": "DVR_USERNAME",
+  "password": "DVR_PASSWORD",
+  "intervalSeconds": 120,
+  "cameras": [
+    { "cameraId": "CAMERA_ID_FROM_THE_APP_1", "rtspPath": "/Streaming/Channels/101" },
+    { "cameraId": "CAMERA_ID_FROM_THE_APP_2", "rtspPath": "/Streaming/Channels/201" }
+  ]
+}

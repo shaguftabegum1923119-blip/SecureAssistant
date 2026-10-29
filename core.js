@@ -318,7 +318,7 @@ async function eraseUserData(uid) {
   const targets = [['cameras', 'uid'], ['vault', 'uid'], ['faces', 'uid'], ['chats', 'uid'], ['billing_clips', 'uid'], ['offline_clips', 'uid'],
     ['footfall', 'uid'], ['alerts', 'userUid'], ['incidents', 'userUid'], ['team_holders', 'ownerUid'], ['team_staff', 'ownerUid'],
     ['secure_codes', 'uid'], ['share_links', 'uid'], ['daily_reports', 'uid'], ['emergencies', 'uid'], ['feedback', 'uid'],
-    ['usage_daily', 'uid'], ['client_errors', 'uid'],
+    ['usage_daily', 'uid'], ['client_errors', 'uid'], ['watch_state', 'uid'],
     ['support_chats', 'uid'], ['support_tickets', 'uid'], ['pending_approvals', 'uid'], ['dvr_bridges', 'uid']];
   for (const [col, field] of targets) await deleteWhere(col, field, uid);
   try { await authAdmin.deleteUser(uid); } catch (e) { if (e.code !== 'auth/user-not-found') throw e; }
