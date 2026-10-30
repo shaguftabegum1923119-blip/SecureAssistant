@@ -32,7 +32,7 @@ Target platforms: Android, iPhone and desktop, all from one FlutterFlow project 
 Privacy, Terms, Refund and Delete-account pages are NOT app pages: the backend serves them at /privacy, /terms, /refund, /delete-account, so the app only needs buttons that open those links.
 
 ## 4. Files
-**Node backend folder (SecureAssistant):** index.js, core.js, b2Storage.js, routes-account.js, routes-cameras.js, routes-money.js, routes-play.js, routes-facematch.js, routes-watch.js (NEW, not pushed yet), routes-wahab.js, routes-help.js, routes-agent.js, routes-dvr.js, routes-owner.js, routes-pdf.js, cron.js, staticData.js, package.json, check-backend.js, run-login-checks.js, vault-test.js, face-test.js and watch-test.js (test scripts only), folder legal/.
+**Node backend folder (SecureAssistant):** index.js, core.js, b2Storage.js, routes-account.js, routes-cameras.js, routes-money.js, routes-play.js, routes-facematch.js, routes-watch.js, routes-attendance.js (NEW), routes-wahab.js, routes-help.js, routes-agent.js, routes-dvr.js, routes-owner.js, routes-pdf.js, cron.js, staticData.js, package.json, check-backend.js, run-login-checks.js, vault-test.js, face-test.js, watch-test.js and attendance-test.js (test scripts only), folder legal/.
 - package.json (new version delivered 2026-10-29, NOT pushed yet) lists `form-data`, `pdfkit` and `sharp` among its dependencies (no new package was added). Its `npm run check` now also covers routes-play.js, routes-facematch.js and routes-watch.js. `npm run check` passed on 2026-10-27 and was run again before the 2026-10-28 push.
 - index.js (updated version delivered 2026-10-29, NOT pushed yet) loads: routes-account, routes-cameras, routes-money, routes-play, routes-facematch, routes-watch, routes-wahab, routes-help, routes-agent, routes-dvr, routes-owner, routes-pdf, cron. **index.js and routes-watch.js must be pushed together**, otherwise the server cannot start (missing module).
 
@@ -72,7 +72,7 @@ camera-health (every 10 min), daily-report (hourly), process-deletions (hourly),
 - Security wording: only "Encrypted" and "Privacy-first". Never "100 percent" or "cannot be hacked".
 - Category 8 (Police/Jail/Courts) kept; Army Camps, Border Posts and any "Military" category removed. Bank account routes removed.
 - Refund policy (refund.html): double charge or no activation = refund; low usage within 7 days = case by case; otherwise no refund; refund window 5-7 days.
-- Legal pages dated 25 Oct 2026. Contact email in pages: secureassistant2319@gmail.com.
+- Legal pages dated 25 Oct 2026 (face-data.html added 30 Oct 2026). Contact email in pages: secureassistant2319@gmail.com.
 - Tools NOT used (decided 2026-10-27): Chromium/puppeteer (PDF reports use pdfkit instead), Docker, Notion API, Tesseract OCR, FFmpeg. Sharp is installed but no image.js has been written yet.
 - Decided 2026-10-28: NO phone-calling voice agent (the reels the owner showed were only examples), and no marketing work for now - keep the app as it is and finish building it first.
 - Build order for new AI tools (decided 2026-10-27): consent-based Face Matching (done, Live), then Unattended Baggage, Loitering and Person Down (code written, Beta, waiting for a real test), then Attendance by consented selfie check-in (blocked until core.js and cron.js are reviewed). Fire/Smoke, Weapon, Number Plate and Scream are postponed (need separate models, give many wrong alerts, or need more memory).
@@ -80,13 +80,13 @@ camera-health (every 10 min), daily-report (hourly), process-deletions (hourly),
 ## 8. AI tools - what's real
 22 tools in staticData.js (new version delivered 2026-10-29, NOT pushed yet; the 2026-10-28 version with Face Matching Live was pushed with commit c7174e8 most likely):
 - LIVE (7): Face Matching (Consent Based), Person Detection and Counting, Vehicle Detection, Crowd Detection, QR Generator and Scanner, Camera Health Monitoring, Encrypted Capsule Save.
-- BETA (8): Intrusion Detection, Loitering Detection, Person Down Detection (Possible Fall), Unattended Baggage Detection, Offline Revive and Rewind, Camera Placement Advisor, Live Location and Status Share, Proof Capsule with Time Window. "Beta" = built but not fully tested on real cameras; do not rely on it. Loitering, Person Down and Unattended Baggage have so far passed only the helper's simulated tests.
-- COMING_SOON (7, never sell as working): Number Plate ANPR, Fire/Smoke, Weapon, Audio Scream, Visitor Background Intelligence, Smart Search/Loyal Customer History, Attendance/Staff Tracking.
+- BETA (9): Intrusion Detection, Loitering Detection, Person Down Detection (Possible Fall), Unattended Baggage Detection, Staff Attendance (Selfie Check-in), Offline Revive and Rewind, Camera Placement Advisor, Live Location and Status Share, Proof Capsule with Time Window. "Beta" = built but not fully tested on real cameras; do not rely on it. Loitering, Person Down, Unattended Baggage and Attendance have so far passed only the helper's simulated tests.
+- COMING_SOON (6, never sell as working): Number Plate ANPR, Fire/Smoke, Weapon, Audio Scream, Visitor Background Intelligence, Smart Search/Loyal Customer History.
 - Categories get their Live/Beta/Coming-soon lists automatically from these statuses. Rule: a tool becomes Live only after the owner has seen it work on a real camera; if a real test fails, set it back to coming_soon.
 
 **Face Matching details:** works on photos the customer sends, it does NOT watch cameras by itself. OpenCV YuNet (detector) + SFace (recognizer), run by the Python service. A face photo becomes a 128-number template; only the template is stored (encrypted per customer, Firestore collection `faces`), the photo is never saved. Only people added with consent can be matched. Limit 50 people per customer. Score thresholds: 0.363 = published SFace "same person" value, 0.5 = confirm-below value (the helper's own estimate - needs real-world tuning). It is a helper, not proof of identity. Faces that are far away, from the side, small or at night often fail.
 
-**PRIVACY GAP (fix before any real customer uses Face Matching):** it is NOT confirmed that deleting an account erases the face templates in `faces` (routes-facematch.js has no erase hook, and core.js and cron.js were not reviewed for this). The `faces` and `watch_state` collections must be added to the delete-account and clean-up code. Needs core.js and cron.js from the owner.
+**Privacy check (done 2026-10-30, after the owner sent core.js and cron.js):** deleting an account already erased the face templates (`faces`, also the `faces/` files in storage). Now `watch_state` and `attendance` are erased too (core.js eraseUserData). Expired `watch_state` (2 days) and `attendance` (ATTENDANCE_KEEP_DAYS, default 90) records are removed by the daily job POST /api/cron/watch-cleanup (cron.js). That job must be added in cron-job.org (once a day, header X-CRON-SECRET). A new page face-data.html (put it in the legal/ folder; it opens at /face-data) explains face codes, attendance and the watch tools. Still needed before real customers: a link to /face-data from the main Privacy page and from the app, and a lawyer's check of all legal pages.
 
 **Watch tools (routes-watch.js, Beta, NOT tested on a real camera):** the camera phone sends a frame every few seconds to POST /api/watch/frame. Only positions and times are stored (Firestore `watch_state`, auto-expiring field `expiresAt`, 2 days). No photo, no face, nobody is identified. At most 10 alerts per camera per hour. Alerts go through createAlert with the types "Unattended Baggage", "Loitering" and "Person Down".
 - Unattended Baggage: a bag with nobody near it for about 3 minutes (and at least 3 frames) gives ONE alert.
@@ -94,7 +94,7 @@ camera-health (every 10 min), daily-report (hourly), process-deletions (hourly),
 - Person Down (must be asked for with tools=down; the default tools are bag,loiter): a person whose box is at least 1.3 times wider than tall (and at least 10 percent of the picture wide) and who does not move for about 60 seconds gives ONE alert. It cannot tell a fall from lying down on purpose, can miss a fall the camera did not see, and is NOT a medical device. Use a zone that avoids beds, sofas and play areas.
 - Checked only with the helper's simulated data (all three tools, zone, getting up, alert failure retried, hourly cap, bad input). watch-test.js (delivered, not run yet) checks all three on the real server with photos. Not verified: that `createAlert` in core.js accepts the new alert types and shows them in the app.
 
-**Planned, not built:** Attendance first, as a consented selfie check-in (staff takes a photo, the app matches a consented person and writes name + time). "Last seen" (which camera and when) and Visitor history only later, after a lawyer check (movement tracking of staff; the helper is not a lawyer). All of them need: core.js and cron.js reviewed first (erase on delete-account, clean up after about 30 days), written consent of every person, notice, and access only for senior holders. Never promise "what was he doing" - the app cannot know that. Do not show any of these as a feature until built and tested.
+**Attendance (built 2026-10-30, Beta, simulated tests only):** routes-attendance.js. A person who was added with consent takes a selfie; POST /api/attendance/checkin (fields: face, type in/out, timezone, optional confirmPersonId) matches it and saves only name, in/out and time (never the photo). Weak matches ask for a human confirm. Same person and same type within 10 minutes is ignored. GET /api/attendance/today (who is in, who has not checked in), GET /api/attendance/report?from=YYYY-MM-DD&to=YYYY-MM-DD (up to 31 days, optional personId), DELETE /api/attendance/record/:id, DELETE /api/attendance/person/:personId. Only the account owner reads the reports. Weak points: no live-person check (a photo of a photo can fool it); a Firestore index may be asked for (attendance: uid + created) - the log shows a link, the code works without it meanwhile. "Last seen" (which camera and when) and Visitor history only later, after a lawyer check (movement tracking of staff; the helper is not a lawyer); they also need written consent, notice, and access only for senior holders. Never promise "what was he doing" - the app cannot know that. Do not show any of these as a feature until built and tested.
 
 ## 9. Python AI service
 - Fixed 2026-10-27: the old 502 was not enough RAM on the free plan plus a heavy torch build. Fixed with the Standard plan, the CPU-only torch build and the app.py fork fix.
@@ -138,13 +138,13 @@ The new watch routes (/api/watch/frame) need the camera phone to send frames; th
 - Legal pages served by the backend.
 
 ## 15. What is LEFT
-**Files ready (delivered 2026-10-29, put in together on the laptop):** Python folder: app.py. SecureAssistant folder: routes-watch.js (3 tools), index.js, staticData.js, package.json (replaces the old one), watch-test.js, STATUS.md. routes-watch.js and index.js must be pushed together. Then `npm run check`, push both services, check both /health, then run `node watch-test.js`.
+**Files ready (delivered 2026-10-29 and 2026-10-30, put in together on the laptop):** Python folder: app.py. SecureAssistant folder: routes-watch.js (3 tools), routes-attendance.js, index.js, core.js, cron.js, staticData.js, package.json, watch-test.js, attendance-test.js, .gitignore, STATUS.md. routes-watch.js, routes-attendance.js and index.js must be pushed together. Then `npm run check`, push both services, check both /health, then run `node watch-test.js`.
 
 **Free, now (the owner's laptop mouse/touchpad was not working on 2026-10-28, so these are waiting):**
-1. Remove the personal test photo me.jpg from GitHub: `git rm --cached me.jpg`, add `me.jpg` to .gitignore, commit, push. Also confirm the GitHub repo is Private. NOT confirmed done.
+1. DONE (2026-10-30): me.jpg removed from GitHub and added to .gitignore. The first .gitignore was damaged by PowerShell (wrong text encoding); a clean replacement was delivered. Still confirm the GitHub repo is Private.
 2. Put in the ready files above, push, check both /health.
-3. Run `node watch-test.js` with real photos (person standing, bag alone, person lying). Only after it passes: tell the helper so the statuses stay Beta (or become Live later); if it fails, send the message shown.
-4. Send core.js and cron.js to the helper: fixes the PRIVACY GAP (erase `faces` and `watch_state` on delete-account, automatic clean-up) and unlocks Attendance.
+3. Run `node watch-test.js` with real photos (person.jpg standing, bag.jpg bag alone, down.jpg person lying), then `node attendance-test.js` (needs an account with an active plan, one clear face photo such as me.jpg, and optionally a different single-face photo). Only after it passes: tell the helper so the statuses stay Beta (or become Live later); if it fails, send the message shown.
+4. DONE: core.js and cron.js were checked and updated. Add one new job in cron-job.org: POST https://secureassistant.onrender.com/api/cron/watch-cleanup once a day with header X-CRON-SECRET.
 5. Check that PYTHON_SECRET and PYTHON_AI_URL on the Node service match the Python service.
 6. Decide AGORA_DAILY_SESSIONS (2 or 4).
 7. DVR bridge real-world test stays on hold (no DVR; do not buy one for this).
@@ -156,19 +156,19 @@ The new watch routes (/api/watch/frame) need the camera phone to send frames; th
 4. Razorpay Live-mode test and Razorpay 2-step verification.
 5. Optional: image.js (Sharp) for screenshot compression.
 
-**Rough count of what is still to build (helper's estimate):** about 6 to 8 backend files (core.js and cron.js fixes, routes-attendance.js, index.js, staticData.js, tests, final STATUS.md); 8 FlutterFlow pages (step-by-step guides, API calls, settings); 2 to 3 small custom actions for the camera phone that sends frames; Play Store listing and setup steps. About 20 items, most of them small.
+**Rough count of what is still to build (helper's estimate):** about 3 to 4 backend items (attendance real-server test, privacy page text, final STATUS.md); 8 FlutterFlow pages (step-by-step guides, API calls, settings); 2 to 3 small custom actions for the camera phone that sends frames; Play Store listing and setup steps. About 15 items, most of them small.
 
 ---
 
 ## हिंदी सारांश (Hindi summary)
 **हो चुका:** Node बैकएंड चालू है; B2 स्टोरेज और vault के टेस्ट पास; /paytest पास; Python AI चल रहा है और चेहरे वाले मॉडल भी तैयार हैं; face-test पास, इसलिए Face Matching "Live" है; Node के logs में "index missing" नहीं है।
 
-**बना है पर असली कैमरे पर चला कर देखा नहीं:** नई `app.py` (`/detect/boxes`), `routes-watch.js` (Unattended Baggage, Loitering, Person Down), नई `index.js`, `staticData.js`, `package.json` और `watch-test.js`। इन्हें एक साथ डालना है। `routes-watch.js` और `index.js` हमेशा साथ में push करनी हैं।
+**बना है पर असली कैमरे पर चला कर देखा नहीं:** नई `app.py` (`/detect/boxes`), `routes-watch.js` (Unattended Baggage, Loitering, Person Down), `routes-attendance.js` (सेल्फ़ी से हाज़िरी), नई `index.js`, `core.js`, `cron.js`, `staticData.js`, `package.json` और `watch-test.js`। इन्हें एक साथ डालना है। `routes-watch.js`, `routes-attendance.js` और `index.js` हमेशा साथ में push करनी हैं।
 
-**ज़रूरी चेतावनी:** पक्का नहीं है कि खाता delete करने पर चेहरे की जानकारी (`faces`) मिटती है। असली ग्राहकों के चेहरे इस्तेमाल करने से पहले इसे ठीक करना है, और इसके लिए `core.js` और `cron.js` चाहिए।
+**ज़रूरी बात:** `core.js` और `cron.js` जाँच ली गई हैं। खाता delete करने पर चेहरे की जानकारी (`faces`), `watch_state` और `attendance` मिट जाती हैं। cron-job.org में एक नया रोज़ का job जोड़ना है: `/api/cron/watch-cleanup`।
 
-**अब करना है (फ़्री):** `me.jpg` को GitHub से हटाना और repo को Private रखना; ऊपर की फ़ाइलें डालकर push करना; `node watch-test.js` चलाना; `core.js` और `cron.js` भेजना; दोनों सर्विस के secret मिलाना; AGORA_DAILY_SESSIONS तय करना।
+**अब करना है (फ़्री):** ऊपर की सब फ़ाइलें डालकर push करना; `node watch-test.js` चलाना; cron-job.org में `watch-cleanup` job जोड़ना; दोनों सर्विस के secret मिलाना; AGORA_DAILY_SESSIONS तय करना।
 
-**बाद में:** हाज़िरी (सहमति से सेल्फ़ी वाली), फिर "Last seen" (पहले वकील की जाँच); पैसे वाले काम: FlutterFlow एक महीना, Anthropic क्रेडिट, RevenueCat से Play Billing, और आख़िर में Razorpay का Live टेस्ट।
+**बाद में:** "Last seen" (पहले वकील की जाँच); पैसे वाले काम: FlutterFlow एक महीना, Anthropic क्रेडिट, RevenueCat से Play Billing, और आख़िर में Razorpay का Live टेस्ट।
 
 **फ़ैसले:** कॉलिंग वाला एजेंट नहीं बनेगा; मार्केटिंग अभी नहीं; पहले ऐप पूरा बनेगा।

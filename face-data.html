@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Face Data and Attendance Notice - Secure Assistant</title>
+<style>
+  :root { --bg: #ffffff; --text: #1f2933; --muted: #52606d; --line: #d9e2ec; --card: #f5f7fa; --link: #0b5fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #11161c; --text: #e6ebf0; --muted: #a3b0bd; --line: #2a3441; --card: #19212b; --link: #7aa7ff; }
+  }
+  html { color-scheme: light dark; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 18px 56px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 28px 0 6px; padding-top: 14px; border-top: 1px solid var(--line); }
+  p, li { color: var(--text); }
+  .muted { color: var(--muted); font-size: 0.92rem; }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 14px 0; }
+  ul { padding-left: 22px; }
+  a { color: var(--link); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Face Data and Attendance Notice</h1>
+  <p class="muted">Secure Assistant &middot; Last updated: 30 October 2026</p>
+
+  <p>This page explains how the face-related features of Secure Assistant work: Face Matching (consent based) and Staff Attendance (selfie check-in). It is part of our <a href="/privacy">Privacy Policy</a> and should be read together with it.</p>
+
+  <div class="box"><strong>In short:</strong> these features work only for people who were added with their consent. We store a numeric face code, not the photo. Only the account owner can see the results. You can have the data deleted at any time.</div>
+
+  <h2>1. Who can be recognised</h2>
+  <p>Only people who were added by the account owner and who gave their consent. Strangers, customers walking past a camera and other people are not looked up, named or tracked by these features. The account owner must have each person's consent before adding them.</p>
+
+  <h2>2. What we store</h2>
+  <ul>
+    <li><strong>Face Matching:</strong> the name, role and purpose entered by the account owner, the time consent was recorded, and a numeric face code (a template of 128 numbers made from the photo). The face code is encrypted with a key that belongs to that account.</li>
+    <li><strong>Staff Attendance:</strong> the name of the matched person, whether it was a check-in or a check-out, the date and time, and the match score.</li>
+    <li><strong>Watch tools</strong> (Unattended Baggage, Loitering, Person Down): no photos are kept. Only short notes about where something was in the picture and for how long are kept for about two days, so the app can tell when to send an alert. The alert text itself is kept in the account's alert list.</li>
+  </ul>
+
+  <h2>3. What we do not store</h2>
+  <ul>
+    <li>The face photo or the selfie. It is used once to make the face code and is then discarded.</li>
+    <li>Any record of where a person walked or what they were doing.</li>
+  </ul>
+
+  <h2>4. How long we keep it</h2>
+  <ul>
+    <li>Face codes stay until the account owner removes the person, or the account is deleted.</li>
+    <li>Attendance records are removed automatically after about 90 days, or earlier if the account owner deletes them.</li>
+    <li>When an account is deleted, its face codes, attendance records and watch notes are erased as part of the account deletion.</li>
+  </ul>
+
+  <h2>5. Who can see it</h2>
+  <p>Only the account owner. We do not sell face data, we do not use it for advertising, and the AI models we use are pre-trained, so customer photos are not used to train them. The data is processed on our own servers and with the hosting and database providers that run the app.</p>
+
+  <h2>6. Accuracy and limits</h2>
+  <ul>
+    <li>These features are helpers, not proof of identity. They can make mistakes, especially in poor light, with masks or with a photo held up to the camera.</li>
+    <li>A person should confirm any result before an important decision or action is taken based on it.</li>
+    <li>Person Down is not a medical device and cannot tell a fall from a person lying down on purpose.</li>
+  </ul>
+
+  <h2>7. Duties of the account owner</h2>
+  <ul>
+    <li>Get clear consent from every person before adding them, and tell them why and for how long their data is used.</li>
+    <li>Follow the laws that apply to you about biometric data, staff monitoring and CCTV notices.</li>
+    <li>Remove a person and their attendance records when they withdraw their consent.</li>
+  </ul>
+
+  <h2>8. Your choices</h2>
+  <p>If you were added to Secure Assistant by an employer, school or business, you can ask them to remove you. You can also email us at the address below and we will help you reach the right account owner or remove the data.</p>
+
+  <h2>9. Contact</h2>
+  <p>Email: <a href="mailto:secureassistant2319@gmail.com">secureassistant2319@gmail.com</a></p>
+</main>
+</body>
+</html>

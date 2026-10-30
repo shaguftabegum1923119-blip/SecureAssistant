@@ -122,18 +122,23 @@ module.exports = function register(app, core) {
     res.json({ ok: true, cleaned, freedBytes, packs });
   }));
 
-  // Removes the small position notes of the Watch tools (watch_state) after their 2-day expiry. Run once a day.
+  // Removes expired short-lived records: the position notes of the Watch tools (watch_state, 2 days)
+  // and attendance check-ins (attendance, ATTENDANCE_KEEP_DAYS, default 90). Run once a day.
   app.post('/api/cron/watch-cleanup', requireCron, wrap(async (req, res) => {
-    let deleted = 0;
-    for (let round = 0; round < 10; round++) {
-      const snap = await db.collection('watch_state').where('expiresAt', '<', new Date()).limit(300).get();
-      if (snap.empty) break;
-      const batch = db.batch();
-      snap.docs.forEach(d => batch.delete(d.ref));
-      await batch.commit();
-      deleted += snap.size;
+    const result = {};
+    for (const col of ['watch_state', 'attendance']) {
+      let deleted = 0;
+      for (let round = 0; round < 10; round++) {
+        const snap = await db.collection(col).where('expiresAt', '<', new Date()).limit(300).get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        deleted += snap.size;
+      }
+      result[col] = deleted;
     }
-    res.json({ ok: true, deleted });
+    res.json({ ok: true, deleted: result });
   }));
 
   app.post('/api/cron/process-deletions', requireCron, wrap(async (req, res) => {

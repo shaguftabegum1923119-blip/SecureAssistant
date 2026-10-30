@@ -122,7 +122,7 @@ const CATEGORIES = [
 const TOOL_STATUS = {
   1: 'live', 2: 'coming_soon', 3: 'live', 4: 'beta', 5: 'beta', 6: 'beta', 7: 'coming_soon', 8: 'coming_soon',
   9: 'live', 10: 'live', 11: 'beta', 12: 'coming_soon', 13: 'coming_soon', 14: 'beta', 15: 'live', 16: 'live', 17: 'beta',
-  18: 'beta', 19: 'beta', 20: 'live', 21: 'coming_soon', 22: 'coming_soon'
+  18: 'beta', 19: 'beta', 20: 'live', 21: 'coming_soon', 22: 'beta'
 };
 const AI_TOOLS = [
   { id: 1, name: 'Face Matching (Consent Based)', work: 'Match a face in a photo against people saved with their consent, such as staff or known visitors. It works on photos you send and does not watch cameras on its own. Only a numeric face code is stored, never the photo.', proof: 'Match result with a confidence score', action: 'Show the matched person name, or no match', whereUsed: 'Home, Education, Office, Shopping, Police' },
@@ -146,7 +146,7 @@ const AI_TOOLS = [
   { id: 19, name: 'Proof Capsule with Time Window', work: 'Encrypted clip stored with the time window around an event', proof: 'Capsule with server time', action: 'Show real photo with before/after', whereUsed: 'All' },
   { id: 20, name: 'Encrypted Capsule Save', work: 'Save analysed video clips encrypted', proof: 'Capsule storage', action: 'Save capsule', whereUsed: 'All' },
   { id: 21, name: 'Smart Search and Loyal Customer History', work: 'Search visitor history', proof: 'History search', action: 'Show search results', whereUsed: 'Shopping, Home, Office' },
-  { id: 22, name: 'Attendance and Staff Tracking', work: 'Staff attendance report', proof: 'Attendance report', action: 'Show attendance report', whereUsed: 'Office, Education' }
+  { id: 22, name: 'Staff Attendance (Selfie Check-in)', work: 'Staff take a selfie in the app to check in and out. People who were added with their consent are matched, and only their name and the time are saved, never the photo. It does not track movement and it is not proof of identity.', proof: 'Daily attendance report with first check-in and last check-out', action: 'Show the attendance report and who has not checked in', whereUsed: 'Office, Education' }
 ].map(t => ({ ...t, status: TOOL_STATUS[t.id] || 'coming_soon' }));
 
 const LIVE_TOOL_NAMES = AI_TOOLS.filter(t => t.status === 'live').map(t => t.name);

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "check": "node --check index.js && node --check core.js && node --check b2Storage.js && node --check routes-account.js && node --check routes-cameras.js && node --check routes-money.js && node --check routes-play.js && node --check routes-facematch.js && node --check routes-watch.js && node --check routes-wahab.js && node --check routes-help.js && node --check routes-agent.js && node --check routes-dvr.js && node --check routes-owner.js && node --check routes-pdf.js && node --check cron.js && node --check staticData.js"
+    "check": "node --check index.js && node --check core.js && node --check b2Storage.js && node --check routes-account.js && node --check routes-cameras.js && node --check routes-money.js && node --check routes-play.js && node --check routes-facematch.js && node --check routes-watch.js && node --check routes-attendance.js && node --check routes-wahab.js && node --check routes-help.js && node --check routes-agent.js && node --check routes-dvr.js && node --check routes-owner.js && node --check routes-pdf.js && node --check cron.js && node --check staticData.js"
   },
   "engines": {
     "node": ">=18"
