@@ -120,9 +120,9 @@ const CATEGORIES = [
 // ---------- AI TOOLS ----------
 // Status words: live = works today, beta = built but not fully tested on real cameras (do not rely on it), coming_soon = not available.
 const TOOL_STATUS = {
-  1: 'live', 2: 'coming_soon', 3: 'live', 4: 'beta', 5: 'beta', 6: 'beta', 7: 'coming_soon', 8: 'coming_soon',
-  9: 'live', 10: 'live', 11: 'beta', 12: 'coming_soon', 13: 'coming_soon', 14: 'beta', 15: 'live', 16: 'live', 17: 'beta',
-  18: 'beta', 19: 'beta', 20: 'live', 21: 'coming_soon', 22: 'beta'
+  1: 'live', 2: 'coming_soon', 3: 'live', 4: 'beta', 5: 'live', 6: 'live', 7: 'coming_soon', 8: 'coming_soon',
+  9: 'live', 10: 'live', 11: 'live', 12: 'coming_soon', 13: 'coming_soon', 14: 'beta', 15: 'live', 16: 'live', 17: 'beta',
+  18: 'beta', 19: 'beta', 20: 'live', 21: 'coming_soon', 22: 'live'
 };
 const AI_TOOLS = [
   { id: 1, name: 'Face Matching (Consent Based)', work: 'Match a face in a photo against people saved with their consent, such as staff or known visitors. It works on photos you send and does not watch cameras on its own. Only a numeric face code is stored, never the photo.', proof: 'Match result with a confidence score', action: 'Show the matched person name, or no match', whereUsed: 'Home, Education, Office, Shopping, Police' },
